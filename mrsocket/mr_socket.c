@@ -20,9 +20,9 @@
 
 #include "socket_server.h"
 #include "mr_slist.h"
-
-#define MALLOC malloc
-#define FREE free
+#include "mr_config.h"
+// #define MALLOC malloc
+// #define FREE free
 
 
 #define MR_SOCKET_TYPE_DATA 1

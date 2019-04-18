@@ -31,11 +31,11 @@
 
 #endif
 
+#include "mr_config.h"
 
 
 #define MAX_INFO 128
 // MAX_SOCKET will be 2^MAX_SOCKET_P
-#define MAX_SOCKET_P 16
 #define MAX_EVENT 64
 // #define MIN_READ_BUFFER 64
 #define MIN_READ_BUFFER 128
@@ -252,10 +252,8 @@ struct send_object {
 	void (*free_func)(void *);
 };
 
-// #define MALLOC skynet_malloc
-// #define FREE skynet_free
-#define MALLOC malloc
-#define FREE free
+// #define MALLOC malloc
+// #define FREE free
 
 struct socket_lock {
 	struct spinlock *lock;

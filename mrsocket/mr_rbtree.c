@@ -1,8 +1,10 @@
 
 #include <stdio.h>
-#include <stdlib.h>
+// #include <stdlib.h>
 #include <string.h>
 #include "mr_rbtree.h"
+#include "mr_config.h"
+
 
 #define rb_parent(r)   ((r)->parent)
 #define rb_color(r) ((r)->color)
@@ -15,7 +17,7 @@
 
 
 struct mr_rbtree_root* mr_rbtree_create(unsigned int key_len){
-	struct mr_rbtree_root *root = (struct mr_rbtree_root *)malloc(sizeof(struct mr_rbtree_root));
+	struct mr_rbtree_root *root = (struct mr_rbtree_root *)MALLOC(sizeof(struct mr_rbtree_root));
 	root->node = NULL;
 	root->key_len = key_len;
 	return root;
@@ -168,7 +170,7 @@ static void insert_rbtree(struct mr_rbtree_root *root, struct mr_rbtree_node *no
 }
 
 static inline struct mr_rbtree_node* create_rbtree_node(uintptr_t key, uintptr_t value){
-	struct mr_rbtree_node* p = (struct mr_rbtree_node *)malloc(sizeof(struct mr_rbtree_node));
+	struct mr_rbtree_node* p = (struct mr_rbtree_node *)MALLOC(sizeof(struct mr_rbtree_node));
 	if (p == NULL)
 		return NULL;
 
@@ -299,7 +301,7 @@ void remove_rbtree(struct mr_rbtree_root *root, struct mr_rbtree_node *node){
 		if (color == BLACK)
 			rbtree_remove_fixup(root, child, parent);
 
-		free(node);
+		FREE(node);
 		return;
 	}
 
@@ -325,7 +327,8 @@ void remove_rbtree(struct mr_rbtree_root *root, struct mr_rbtree_node *node){
 
 	if (color == BLACK)
 		rbtree_remove_fixup(root, child, parent);
-	free(node);
+
+	FREE(node);
 }
 
 void mr_rbtree_remove(struct mr_rbtree_root *root, uintptr_t key){
@@ -343,41 +346,40 @@ static void destroy_rbtree(struct mr_rbtree_node* tree){
 	if (tree->right != NULL)
 		destroy_rbtree(tree->right);
 
-	free(tree);
+	FREE(tree);
 }
 
 void mr_rbtree_destroy(struct mr_rbtree_root *root){
 	if (root != NULL)
 		destroy_rbtree(root->node);
 
-	free(root);
+	FREE(root);
 }
 
 
-void mr_rbtree_test(void){
+// void mr_rbtree_test(void){
 	
-	struct mr_rbtree_root* rbtree = mr_rbtree_create(8);
-	char key1[8] = {0};
-	memset(key1, 97, sizeof(key1));
-	int value1 = 1;
+// 	struct mr_rbtree_root* rbtree = mr_rbtree_create(8);
+// 	char key1[8] = {0};
+// 	memset(key1, 97, sizeof(key1));
+// 	int value1 = 1;
 
-	char key2[8] = {0};
-	memset(key2, 98, sizeof(key2));
-	int value2 = 2;
+// 	char key2[8] = {0};
+// 	memset(key2, 98, sizeof(key2));
+// 	int value2 = 2;
 
-	char key3[8] = {0};
-	memset(key3, 99, sizeof(key3));
-	int value3 = 3;
+// 	char key3[8] = {0};
+// 	memset(key3, 99, sizeof(key3));
+// 	int value3 = 3;
 
-	char key4[8] = {0};
-	memset(key4, 100, sizeof(key4));
-	int value4 = 3;
+// 	char key4[8] = {0};
+// 	memset(key4, 100, sizeof(key4));
+// 	int value4 = 3;
 
-	mr_rbtree_insert(rbtree, (uintptr_t)key1, (uintptr_t)&value1);
-	mr_rbtree_insert(rbtree, (uintptr_t)key2, (uintptr_t)&value2);
-	mr_rbtree_insert(rbtree, (uintptr_t)key3, (uintptr_t)&value3);
-	mr_rbtree_insert(rbtree, (uintptr_t)key4, (uintptr_t)&value4);
-
-}
+// 	mr_rbtree_insert(rbtree, (uintptr_t)key1, (uintptr_t)&value1);
+// 	mr_rbtree_insert(rbtree, (uintptr_t)key2, (uintptr_t)&value2);
+// 	mr_rbtree_insert(rbtree, (uintptr_t)key3, (uintptr_t)&value3);
+// 	mr_rbtree_insert(rbtree, (uintptr_t)key4, (uintptr_t)&value4);
+// }
 
 

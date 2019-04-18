@@ -4,39 +4,28 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-
 #include "win/winport.h"
 #include "win/atomic.h"
 #include "win/spinlock.h"
-
 #else
-
 #include <pthread.h>
 #include "spinlock.h"
 #include "atomic.h"
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
-
 #endif
-
 #include "mr_slist.h"
 #include "mr_rbtree.h"
 #include "mr_time.h"
 #include "mr_timer.h"
 #include "socket_server.h"
+#include "mr_config.h"
 
-
-#define MALLOC malloc
-#define FREE free
-
-#define MAX_SOCKET_P 16
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
 #define UDP_ADDRESS_SIZE 19	// ipv6 128bit + port 16bit + 1 byte type
-
 
 #define SOCKET_TYPE_INVALID 0
 #define SOCKET_TYPE_RESERVE 1
@@ -74,28 +63,19 @@ struct mr_message {
 
 struct mr_kcp_socket {
 	struct mr_queue node;
-	int _uid;
 	int fd;
 	int kcp_fd;
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 	int type;
-	int udpconnecting;
 #else
 	uint8_t type;
-	uint16_t udpconnecting;
 #endif
-	int link_time;
-	int recent_time;
 	uint8_t udp_address[UDP_ADDRESS_SIZE];
 	uint8_t udp_addr_sz;
 	uintptr_t opaque;
 	ikcpcb *kcp;
 	struct spinlock dw_lock;
-
-	char udp_addr[128];
-
 	struct mr_rbtree_root* rbtree;
-	// int addr_len;
 };
 
 struct mr_kcp_server {
@@ -324,7 +304,7 @@ static inline void kcp_create(struct mr_kcp_socket* skt){
 
 static inline void kcp_free(struct mr_kcp_socket* skt){
     if (skt->kcp){
-        free(skt->kcp);
+        FREE(skt->kcp);
         skt->kcp = NULL;
     }
 }
@@ -369,7 +349,7 @@ int mr_socket_kcp(uintptr_t uid, const char* addr, int port){
 	skt->opaque = uid;
 	skt->fd = fd;
 	skt->type = SOCKET_TYPE_BIND;
-	printf("mr_socket_kcp _uid=%d, kcp_fd=%d, addr=%s, port=%d, fd=%d\n", skt->_uid, kcp_fd, addr, port, fd);
+	printf("mr_socket_kcp kcp_fd=%d, addr=%s, port=%d, fd=%d\n", kcp_fd, addr, port, fd);
 	return kcp_fd;
 }
 
@@ -391,7 +371,7 @@ int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 	spinlock_lock(&MR_KCP_SERVER->wt_lock);
 	mr_slist_link(&MR_KCP_SERVER->wt_list, (struct mr_slist_node*)msg);
 	spinlock_unlock(&MR_KCP_SERVER->wt_lock);
-	printf("mr_socket_kcp_connect _uid=%d, kcp_fd=%d, addr=%s, port=%d, fd=%d\n", skt->_uid, kcp_fd, addr, port, skt->fd);
+	printf("mr_socket_kcp_connect kcp_fd=%d, addr=%s, port=%d, fd=%d\n", kcp_fd, addr, port, skt->fd);
 	return 0;
 }
 
@@ -452,16 +432,18 @@ static struct mr_kcp_socket* create_accept_socket(struct mr_kcp_socket* bind_skt
 	accept_skt->type = SOCKET_TYPE_ACCEPT;
 	memcpy(accept_skt->udp_address, udp_address, UDP_ADDRESS_SIZE);
 	mr_rbtree_insert(bind_skt->rbtree, (uintptr_t)accept_skt->udp_address, (uintptr_t)accept_skt);
-	mr_socket_kcp_udp_address(accept_skt->udp_address, accept_skt->udp_addr, sizeof(accept_skt->udp_addr));
-	// printf("create_accept_socket accept_skt udp_addr =%s\n", accept_skt->udp_addr);
+
+	char udp_addr[128];
+	mr_socket_kcp_udp_address(accept_skt->udp_address, udp_addr, sizeof(udp_addr));
+	printf("create_accept_socket accept_skt udp_addr =%s\n", udp_addr);
 
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->type = MR_SOCKET_TYPE_ACCEPT;
 	msg->kcp_fd = bind_skt->kcp_fd;
 	msg->uid = accept_skt->opaque;
-	int len = strlen(accept_skt->udp_addr);
+	int len = strlen(udp_addr);
 	char* buffer = (char*)MALLOC(len);
-	memcpy(buffer, accept_skt->udp_addr, len);
+	memcpy(buffer, udp_addr, len);
 	msg->buffer = buffer;
 	msg->ud = kcp_fd;
 	forward_list_message(msg);
@@ -472,7 +454,7 @@ static struct mr_kcp_socket* get_accept_socket(struct mr_kcp_socket* bind_skt, c
 	if (!bind_skt->rbtree){
 		create_rbtree(bind_skt, udp_address);
 	}
-	struct mr_kcp_socket* accept_skt = (struct mr_kcp_socket*)mr_rbtree_search(bind_skt->rbtree, udp_address);
+	struct mr_kcp_socket* accept_skt = (struct mr_kcp_socket*)mr_rbtree_search(bind_skt->rbtree, (uintptr_t)udp_address);
 	if (accept_skt){
 		// printf("get_accept_socket udp_addr =%s\n", accept_skt->udp_addr);
 		int ret = memcmp(accept_skt->udp_address, udp_address, bind_skt->udp_addr_sz);
@@ -499,13 +481,13 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
     if (len < 0){
         switch(len){
             case -1:
-                printf("[KCP][ERROR]ikcp_input code:%d,:%s \n",len, (const char*)accept_skt->udp_addr);
+                // printf("[KCP][ERROR]ikcp_input code:%d,:%s \n",len, (const char*)accept_skt->udp_addr);
             break;
             case -2:
-                printf("[KCP][ERROR]ikcp_input code:%d,:%s \n",len, (const char*)accept_skt->udp_addr);
+                // printf("[KCP][ERROR]ikcp_input code:%d,:%s \n",len, (const char*)accept_skt->udp_addr);
             break;
             case -3:
-                printf("[KCP][ERROR]ikcp_input code:%d,cmd:%s \n",len, (const char*)accept_skt->udp_addr);
+                // printf("[KCP][ERROR]ikcp_input code:%d,cmd:%s \n",len, (const char*)accept_skt->udp_addr);
             break;
             default:
                 assert(0);
@@ -521,6 +503,7 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
 		    char* rd_data = (char*)MALLOC(len);
 		    len = ikcp_recv(accept_skt->kcp, rd_data, len);
 		    if (len < 0){
+		    	FREE(rd_data);
 		        switch(len){
 		            case -1:
 		                printf("socket_read_kcp -1\n");
@@ -546,9 +529,7 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
 				msg->type = MR_SOCKET_TYPE_DATA;
 				msg->kcp_fd = accept_skt->kcp_fd;
 				msg->uid = accept_skt->opaque;
-				char* buffer = (char*)MALLOC(len);
-				memcpy(buffer, rd_data, len);
-				msg->buffer = buffer;
+				msg->buffer = rd_data;
 				msg->ud = len;
 				forward_list_message(msg);
 		    }

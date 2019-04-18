@@ -11,12 +11,15 @@ set(LIB_HEADER
 	ikcp.h
 	mr_socket_kcp.h
 	mr_time.h
+	mr_timer.h
 	mr_queue.h
 	mr_slist.h
 	mr_socket.h
 	mr_buffer.h
 	mr_code.h
 	mr_rbtree.h
+	mr_mem.h
+	mr_config.h
 )
 
 set(LIB_SRC
@@ -26,6 +29,8 @@ set(LIB_SRC
 	mr_socket.c
 	mr_buffer.c
 	mr_rbtree.c
+	mr_mem.c
+	mr_timer.c
 )
 
 if(WIN32)

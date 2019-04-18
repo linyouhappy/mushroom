@@ -23,6 +23,7 @@ extern "C" {
 #include "mrsocket/mr_code.h"
 #include "mrsocket/mr_socket.h"
 #include "mrsocket/mr_socket_kcp.h"
+#include "mrsocket/mr_mem.h"
 
 #ifdef __cplusplus
 }
@@ -51,6 +52,7 @@ static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int ud){
         user->rcv_id = 0;
 
         char tmp[1024*100] = {0};
+		// char tmp[128] = { 0 };
         // snprintf(tmp, 2048, "send data hello world");
         memset(tmp, 97, sizeof(tmp)-1);
         char* ptr = tmp;
@@ -62,9 +64,8 @@ static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int ud){
         user->snd_id++;
 
        struct mr_buffer* buffer = user->buffer;
-       mr_buffer_write_pack(buffer, tmp, sizeof(tmp)-1);
-       // int ret = mr_socket_send(fd, buffer->pack_data, buffer->pack_len);
-       int ret = mr_socket_kcp_send(accept_fd, buffer->pack_data, buffer->pack_len);
+       mr_buffer_write_pack(buffer, tmp, sizeof(tmp));
+       int ret = mr_socket_kcp_send(accept_fd, buffer->write_data, buffer->write_len);
         if (ret < 0){
            printf("mr_socket_kcp_send faild ret = %d\n", ret);
         }
@@ -79,7 +80,8 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
         mr_buffer_push(buffer, data, size);
         int ret = mr_buffer_read_pack(buffer);
         if (ret > 0){
-            const char* ptr = buffer->pack_data;
+            const char* ptr = buffer->read_data;
+            int read_len = buffer->read_len;
             uint32_t id = 0;
             ptr = mr_decode32u(ptr, &id);
             uint32_t time = 0;
@@ -88,22 +90,26 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
             uint32_t cur_time = mr_clock();
             //MRLOG("[server]id = %d, costtime = %d \n", id, cur_time-time);
             assert(id%2 == 0);
-            char* enptr = buffer->pack_data;
+            char* enptr = buffer->read_data;
             enptr = mr_encode32u(enptr, ++id);
 
-            mr_buffer_write_pack(buffer, buffer->pack_data, buffer->pack_len);
-            int ret = mr_socket_kcp_send(fd, buffer->pack_data, buffer->pack_len);
+            mr_buffer_write_pack(buffer, buffer->read_data, buffer->read_len);
+            int ret = mr_socket_kcp_send(fd, buffer->write_data, buffer->write_len);
             if (ret < 0){
                 printf("[server]mr_socket_kcp_send faild ret = %d\n", ret);
             }
         }
     }else{
         // MRLOG("[main]server handle_kcp_data client\n");
+        mr_mem_info();
+
         struct mr_buffer* buffer = user->buffer;
         mr_buffer_push(buffer, data, size);
         int ret = mr_buffer_read_pack(buffer);
         if (ret > 0){
-            const char* ptr = buffer->pack_data;
+            const char* ptr = buffer->read_data;
+            int read_len = buffer->read_len;
+
             uint32_t id = 0;
             ptr = mr_decode32u(ptr, &id);
             uint32_t time = 0;
@@ -117,14 +123,14 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
             printf("[client]id = %d, rcv_id=%d, costtime = %d \n", id, rcv_id, cur_time-time);
             assert(id%2 == 1);
 
-            char* enptr = buffer->pack_data;
+            char* enptr = buffer->read_data;
             enptr = mr_encode32u(enptr, ++id);
             enptr = mr_encode32u(enptr, cur_time);
             enptr = mr_encode32u(enptr, (uint32_t)user->snd_id);
             user->snd_id++;
 
-            mr_buffer_write_pack(buffer, buffer->pack_data, buffer->pack_len);
-            int ret = mr_socket_kcp_send(fd, buffer->pack_data, buffer->pack_len);
+            mr_buffer_write_pack(buffer, buffer->read_data, buffer->read_len);
+            int ret = mr_socket_kcp_send(fd, buffer->write_data, buffer->write_len);
             if (ret < 0)
             {
                printf("[client]mr_socket_kcp_send faild ret = %d\n", ret);
@@ -135,6 +141,9 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
 
 int main(int argc, char* argv[])
 {
+    mr_mem_detect(0xffffff);
+    // mr_mem_check(21);
+    // mr_mem_check(22);
     mr_socket_kcp_init();
     mr_socket_kcp_run();
 
@@ -154,7 +163,7 @@ int main(int argc, char* argv[])
 	suser->bind_fd = server_fd;
 
    int i = 0;
-   for (; i < 1; ++i)
+   for (; i < 10; ++i)
    {
         struct User* cuser = (struct User*)malloc(sizeof(struct User));
         cuser->id = i;
