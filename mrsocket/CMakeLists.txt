@@ -12,7 +12,6 @@ set(LIB_HEADER
 	mr_socket_kcp.h
 	mr_time.h
 	mr_timer.h
-	mr_queue.h
 	mr_slist.h
 	mr_socket.h
 	mr_buffer.h
