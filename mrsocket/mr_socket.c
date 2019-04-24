@@ -58,23 +58,23 @@ static struct mr_socket * MR_SOCKET = NULL;
 
 
 static void mr_handle_data(uintptr_t uid, int fd, char* data, int size){
-    printf("[mr_socket.c]mr_handle_data uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
+    printf("[mr_socket]mr_handle_data uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
 static void mr_handle_connect(uintptr_t uid, int fd, char* data, int size){
-	printf("[mr_socket.c]mr_handle_connect uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
+	printf("[mr_socket]mr_handle_connect uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
 static void mr_handle_close(uintptr_t uid, int fd, char* data, int size){
-    printf("[mr_socket.c]mr_handle_close uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
+    printf("[mr_socket]mr_handle_close uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
 static void mr_handle_accept(uintptr_t uid, int fd, char* data, int accept_fd){
-    printf("[mr_socket.c]mr_handle_accept uid=%d fd =%d accept_fd=%d data=%s\n", (int)uid, fd, accept_fd, data);
+    printf("[mr_socket]mr_handle_accept uid=%d fd =%d accept_fd=%d data=%s\n", (int)uid, fd, accept_fd, data);
     mr_socket_start(uid, accept_fd);
 }
 static void mr_handle_error(uintptr_t uid, int fd, char* data, int size){
-    printf("[mr_socket.c]mr_handle_error uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
+    printf("[mr_socket]mr_handle_error uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
 static void mr_handle_warning(uintptr_t uid, int fd, char* data, int size){
-    printf("[mr_socket.c]mr_handle_warning uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
+    printf("[mr_socket]mr_handle_warning uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
 static void mr_handle_udp(uintptr_t uid, int fd, char* data, int size, char* address){
 	char udp_addr[256];
@@ -83,7 +83,7 @@ static void mr_handle_udp(uintptr_t uid, int fd, char* data, int size, char* add
     char* tmp = (char*)malloc(size+1);
 	memset(tmp, 0, size + 1);
     memcpy(tmp, data, size);
-    printf("[mr_socket.c]mr_handle_udp[%s] uid=%d fd=%d size=%d data=%s \n", udp_addr, (int)uid, fd, size, tmp);
+    printf("[mr_socket]mr_handle_udp[%s] uid=%d fd=%d size=%d data=%s \n", udp_addr, (int)uid, fd, size, tmp);
 }
 
 void mr_socket_init(void) {
@@ -166,7 +166,9 @@ void mr_socket_free(void) {
 	assert(SOCKET_SERVER);
 	socket_server_release(SOCKET_SERVER);
 	SOCKET_SERVER = NULL;
+
 	mr_socket_clear();
+	spinlock_destroy(&MR_SOCKET->list_lock);
 	FREE(MR_SOCKET);
 	MR_SOCKET = NULL;
 }

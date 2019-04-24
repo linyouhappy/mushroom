@@ -36,7 +36,6 @@ inline static void* fill_prefix(char* ptr, size_t size) {
 	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
 	uint32_t uid = ATOM_INC(&_uid);
 	memcpy(&p->uid, &uid, sizeof(uid));
-
 	if (uid < _max_uid){
 		uid_mems[uid] = (uint32_t)size;
 		if (check_mems[uid]){
@@ -67,8 +66,9 @@ inline static void* clean_prefix(char* ptr) {
 	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
 	uint32_t uid;
 	memcpy(&uid, &p->uid, sizeof(uid));
-	uid_mems[uid] = 0;
-
+	if (uid < _max_uid){
+		uid_mems[uid] = 0;
+	}
 	uint32_t dogtag;
 	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
 	if (dogtag == MEMORY_FREETAG) {
@@ -95,7 +95,8 @@ void * mr_mem_malloc(size_t sz){
 void mr_mem_free(void *ptr){
 	if (ptr == NULL) return;
 	if (_max_uid == 0){
-		return free(ptr);
+		free(ptr);
+		return;
 	}
 	void* rawptr = clean_prefix(ptr);
 	free(rawptr);
@@ -103,14 +104,14 @@ void mr_mem_free(void *ptr){
 
 void mr_mem_info(void){
 	if (_max_uid > 0){
-		 int uid = 0;
-		 for (; uid < 0xffff; ++uid){
+		uint32_t uid = 0;
+		 for (; uid < _max_uid; ++uid){
 		 	if(uid_mems[uid]){
 		 		printf("mr_mem_info uid=%d, mem=%ld \n", uid, uid_mems[uid]);
 		 	}
 		 }
 	}
-	 printf("mr_mem_info:used_memory=%d, memory_block=%d", _used_memory, _memory_block);
+	 printf("mr_mem_info used_memory=%dkb, memory_block=%d \n", _used_memory>>10, _memory_block);
 }
 
 void mr_mem_detect(uint32_t max_uid){

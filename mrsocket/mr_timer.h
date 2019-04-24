@@ -1,8 +1,8 @@
 #ifndef mr_timer_h
 #define mr_timer_h
 
-#include "mr_queue.h"
 #include <stdint.h>
+#include "mr_slist.h"
 
 #define TIME_NEAR_SHIFT 8
 #define TIME_NEAR 0x100
@@ -13,8 +13,9 @@
 
 #undef near
 
+
 struct mr_timer_node {
-    struct mr_queue queue;
+   	struct mr_slist queue;
     uint32_t time;
 };
 
@@ -27,12 +28,12 @@ struct mr_timer {
 
 struct mr_timer* mr_timer_create(void);
 void mr_timer_free(struct mr_timer* timer);
-void mr_timer_link(struct mr_timer_node* node, struct mr_queue* skt, uint32_t time);
-void mr_timer_add(struct mr_timer* timer, struct mr_queue* skt, uint32_t time);
-void mr_timer_change(struct mr_timer* timer, struct mr_queue* skt, uint32_t time);
-void mr_timer_remove(struct mr_timer* timer, struct mr_queue* skt);
-void mr_timer_move_list(struct mr_timer* timer, int level, int idx);
+// void mr_timer_link(struct mr_timer_node* node, struct mr_slist_node* skt, uint32_t time);
+void mr_timer_add(struct mr_timer* timer, struct mr_slist_node* skt, uint32_t time);
+// void mr_timer_change(struct mr_timer* timer, struct mr_slist_node* skt, uint32_t time);
+// void mr_timer_remove(struct mr_timer* timer, struct mr_slist_node* skt);
+// void mr_timer_move_list(struct mr_timer* timer, int level, int idx);
 void mr_timer_shift(struct mr_timer* timer);
-
+void mr_timer_execute(struct mr_timer* timer, void(*func)(struct mr_timer*, void*));
 
 #endif

@@ -6,17 +6,17 @@
 typedef void (*mr_kcp_callback)(uintptr_t, int, char*, int);
 
 
-void mr_socket_kcp_init(void);
+void mr_socket_kcp_init(uint32_t conv);
 void mr_socket_kcp_exit(void);
 void mr_socket_kcp_free(void);
 // void mr_kcp_set_handle(mr_kcp_callback cb);
 
 void mr_kcp_set_handle_data(mr_kcp_callback cb);
 void mr_kcp_set_handle_close(mr_kcp_callback cb);
-void mr_kcp_set_handle_accept(mr_kcp_callback cb);
+void mr_kcp_set_handle_baccept(mr_kcp_callback cb);
+void mr_kcp_set_handle_caccept(mr_kcp_callback cb);
 void mr_kcp_set_handle_error(mr_kcp_callback cb);
 void mr_kcp_set_handle_warning(mr_kcp_callback cb);
-
 
 void mr_socket_kcp_update(void);
 void mr_socket_kcp_run(void);
