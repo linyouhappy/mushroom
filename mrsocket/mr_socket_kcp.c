@@ -32,10 +32,8 @@
 #define SOCKET_TYPE_INVALID 0
 #define SOCKET_TYPE_RESERVE 1
 #define SOCKET_TYPE_BIND 2
-// #define SOCKET_TYPE_CONNECTED 3
 #define SOCKET_TYPE_BACCEPT 4
 #define SOCKET_TYPE_CACCEPT 5
-// #define SOCKET_TYPE_PACCEPT 5
 
 #define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
 
@@ -52,6 +50,12 @@
 #define MR_SOCKET_TYPE_WARNING 7
 #define MR_SOCKET_TYPE_COUNT 8
 
+
+#define MR_KCP_CMD_CONNECT 1
+#define MR_KCP_CMD_SEND 2
+#define MR_KCP_CMD_CLOSE 3
+
+#define KCPASSERT(_ARGS_) assert(_ARGS_)
 
 struct mr_message {
 	struct mr_slist_node node;
@@ -366,23 +370,6 @@ void mr_socket_kcp_free(void){
 	SOCKET_SERVER = NULL;
 }
 
-int mr_socket_kcp_close(int kcp_fd){
-	struct mr_kcp_socket* skt = &MR_KCP_SERVER->slot[HASH_ID(kcp_fd)];
-	if (skt->kcp_fd != kcp_fd) {
-		fprintf(stderr, "[WARN]mr_socket_kcp_close skt->kcp_fd != kcp_fd kcp_fd =%d \n", kcp_fd);
-		// assert(0);
-		return -1;
-	}
-
-	
-
-	return 0;
-}
-
-void mr_socket_kcp_shutdown(int kcp_fd){
-
-}
-
 static int reserve_id(struct mr_kcp_server* kcp_svr) {
 	int i;
 	for (i=0;i<MAX_SOCKET;i++) {
@@ -409,13 +396,13 @@ int mr_socket_kcp(uintptr_t uid, const char* addr, int port){
 	int kcp_fd = reserve_id(MR_KCP_SERVER);
 	if(kcp_fd < 0){
 		fprintf(stderr, "[WARN]mr_socket_kcp kcp_fd < 0   kcp_fd =%d \n", kcp_fd);
-		// assert(0);
+		KCPASSERT(0);
 		return -1;
 	}
 	int fd = socket_server_udp(SOCKET_SERVER, kcp_fd, addr, port);
 	if (fd < 0){
-		// assert(0);
 		fprintf(stderr, "[WARN]mr_socket_kcp fd < 0   kcp_fd =%d, fd =%d\n", kcp_fd, fd);
+		KCPASSERT(0);
 		return -1;
 	}
 	struct mr_kcp_socket* skt = &MR_KCP_SERVER->slot[HASH_ID(kcp_fd)];
@@ -428,15 +415,44 @@ int mr_socket_kcp(uintptr_t uid, const char* addr, int port){
 	return kcp_fd;
 }
 
-int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
+int mr_socket_kcp_close(int kcp_fd){
 	struct mr_kcp_socket* skt = &MR_KCP_SERVER->slot[HASH_ID(kcp_fd)];
-	if (skt->kcp_fd != kcp_fd || skt->type != SOCKET_TYPE_BIND) {
-		fprintf(stderr, "[WARN]mr_socket_kcp_connect skt->kcp_fd != kcp_fd || skt->type != SOCKET_TYPE_BIND kcp_fd =%d \n", kcp_fd);
-		// assert(0);
+	if (skt->kcp_fd != kcp_fd) {
+		fprintf(stderr, "[WARN]mr_socket_kcp_close skt->kcp_fd != kcp_fd kcp_fd =%d \n", kcp_fd);
+		KCPASSERT(0);
 		return -1;
 	}
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->kcp_fd = kcp_fd;
+	msg->uid = MR_KCP_CMD_CLOSE;
+	msg->ud = 0;
+	msg->buffer = NULL;
+
+	spinlock_lock(&MR_KCP_SERVER->wt_lock);
+	mr_slist_link(&MR_KCP_SERVER->wt_list, (struct mr_slist_node*)msg);
+	spinlock_unlock(&MR_KCP_SERVER->wt_lock);
+	return 0;
+}
+
+void mr_socket_kcp_shutdown(int kcp_fd){
+
+}
+
+int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
+	struct mr_kcp_socket* skt = &MR_KCP_SERVER->slot[HASH_ID(kcp_fd)];
+	if (skt->kcp_fd != kcp_fd) {
+		fprintf(stderr, "[WARN]mr_socket_kcp_connect skt->kcp_fd != kcp_fd  kcp_fd =%d \n", kcp_fd);
+		KCPASSERT(0);
+		return -1;
+	}
+	if (skt->type != SOCKET_TYPE_BIND) {
+		fprintf(stderr, "[WARN]mr_socket_kcp_connect skt->type != SOCKET_TYPE_BIND kcp_fd =%d \n", kcp_fd);
+		KCPASSERT(0);
+		return -1;
+	}
+	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
+	msg->kcp_fd = kcp_fd;
+	msg->uid = MR_KCP_CMD_CONNECT;
 
 	char* buffer = (char*)MALLOC(UDP_ADDRESS_SIZE);
 	memset(buffer, 0, UDP_ADDRESS_SIZE);
@@ -453,12 +469,12 @@ int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 int mr_socket_kcp_send(int kcp_fd, const void* buffer, int sz){
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->kcp_fd = kcp_fd;
+	msg->uid = MR_KCP_CMD_SEND;
 
 	char* sbuffer = (char*)MALLOC(sz);
 	memcpy(sbuffer, buffer, sz);
 	msg->buffer = sbuffer;
 	msg->ud = sz;
-	// msg->option = NULL;
 	
 	spinlock_lock(&MR_KCP_SERVER->wt_lock);
 	mr_slist_link(&MR_KCP_SERVER->wt_list, (struct mr_slist_node*)msg);
@@ -485,7 +501,8 @@ static void create_rbtree(struct mr_kcp_socket* bind_skt, const char* udp_addres
 			addrsz = 1+sizeof(sa.v6.sin6_port)+sizeof(sa.v6.sin6_addr);
 			break;
 		default:
-			assert(0);
+			fprintf(stderr, "[WARN]create_rbtree Unknown protocol=%d \n", protocol);
+			KCPASSERT(0);
 			break;
 	}
 	bind_skt->rbtree = mr_rbtree_create(addrsz);
@@ -496,6 +513,7 @@ static struct mr_kcp_socket* create_accept_socket(struct mr_kcp_socket* bind_skt
 	int kcp_fd = reserve_id(MR_KCP_SERVER);
 	if(kcp_fd < 0){
 		fprintf(stderr, "[WARN]create_accept_socket kcp_fd < 0 bind_skt->kcp_fd=%d, skt_type =%d \n", bind_skt->kcp_fd, skt_type);
+		KCPASSERT(0);
 		return NULL;
 	}
 
@@ -511,23 +529,24 @@ static struct mr_kcp_socket* create_accept_socket(struct mr_kcp_socket* bind_skt
 		accept_skt->type = SOCKET_TYPE_CACCEPT;
 	}else{
 		fprintf(stderr, "[WARN]create_accept_socket bind_skt->kcp_fd=%d, skt_type =%d \n", bind_skt->kcp_fd, skt_type);
+		KCPASSERT(0);
 		return NULL;
-		// assert(0);
 	}
 	memcpy(accept_skt->udp_address, udp_address, UDP_ADDRESS_SIZE);
 	mr_rbtree_insert(bind_skt->rbtree, (uintptr_t)accept_skt->udp_address, (uintptr_t)accept_skt);
 
-	char udp_addr[128];
+	char udp_addr[128] = {0};
 	mr_socket_kcp_udp_address(accept_skt->udp_address, udp_addr, sizeof(udp_addr));
-	// printf("create_accept_socket accept_skt udp_addr =%s \n", udp_addr);
-	// printf("create_accept_socket bind_skt->kcp_fd=%d, accept_skt->kcp_fd=%d, accept_skt->type=%d \n", bind_skt->kcp_fd, accept_skt->kcp_fd, accept_skt->type);
+	printf("create_accept_socket accept_skt udp_addr =%s \n", udp_addr);
+	printf("create_accept_socket bind_skt->kcp_fd=%d, accept_skt->kcp_fd=%d, accept_skt->type=%d \n", bind_skt->kcp_fd, accept_skt->kcp_fd, accept_skt->type);
 
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->type = accept_skt->type;
 	msg->kcp_fd = bind_skt->kcp_fd;
 	msg->uid = accept_skt->opaque;
-	int len = strlen(udp_addr);
+	int len = strlen(udp_addr)+1;
 	char* buffer = (char*)MALLOC(len);
+	memset(buffer, 0, len);
 	memcpy(buffer, udp_addr, len);
 	msg->buffer = buffer;
 	msg->ud = kcp_fd;
@@ -550,17 +569,6 @@ static struct mr_kcp_socket* get_accept_socket(struct mr_kcp_socket* bind_skt, c
 	return accept_skt;
 }
 
-static int handle_bind_write(struct mr_kcp_socket* bind_skt, struct mr_message* msg){
-	const char* udp_address = (const char*)msg->buffer;
-	struct mr_kcp_socket* accept_skt = get_accept_socket(bind_skt, udp_address, SOCKET_TYPE_BACCEPT);
-	if (!accept_skt){
-		fprintf(stderr, "[WARN]handle_bind_write accept_skt == NULL, bind_skt->kcp_fd=%d \n", bind_skt->kcp_fd);
-		// assert(0);
-		return -1;
-    }
-    return 0;
-}
-
 static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message* msg){
 	// printf("kcp_handle_read accept_skt->kcp_fd=%d,accept_skt->type=%d, uid=%lld, ud=%d \n", accept_skt->kcp_fd, accept_skt->type, msg->uid, msg->ud);
     int len = ikcp_input(accept_skt->kcp, msg->buffer, msg->ud);
@@ -572,14 +580,14 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
             break;
             case -2:
                 fprintf(stderr, "[WARN]kcp_handle_read accept_skt->kcp_fd=%d, code:%d\n", accept_skt->kcp_fd, len);
-                assert(0);
+                KCPASSERT(0);
             break;
             case -3:
-               fprintf(stderr, "[WARN]kcp_handle_read accept_skt->kcp_fd=%d, code:%d\n", accept_skt->kcp_fd, len);
-               assert(0);
+            	fprintf(stderr, "[WARN]kcp_handle_read accept_skt->kcp_fd=%d, code:%d\n", accept_skt->kcp_fd, len);
+            	KCPASSERT(0);
             break;
             default:
-                assert(0);
+                KCPASSERT(0);
             break;
         }
     }else{
@@ -595,21 +603,21 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
 		        switch(len){
 		            case -1:
 		                fprintf(stderr, "[WARN]ikcp_recv -1\n");
-		                assert(0);
+		                KCPASSERT(0);
 		                break;
 		            break;
 		            case -2:
-		                fprintf(stderr, "[WARN]ikcp_recv -2\n");
-		                assert(0);
+		            	fprintf(stderr, "[WARN]ikcp_recv -2\n");
+		            	KCPASSERT(0);
 		                break;
 		            break;
 		            case -3:
-		                fprintf(stderr, "[WARN]ikcp_recv -3\n");
-		                assert(0);
+		            	fprintf(stderr, "[WARN]ikcp_recv -3\n");
+		            	KCPASSERT(0);
 		            break;
 		            default:
 		                fprintf(stderr, "[WARN]ikcp_recv Unknown\n");
-		                assert(0);
+		                KCPASSERT(0);
 		            break;
 		        }
 		    }else{
@@ -625,16 +633,46 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
     }
 }
 
+
+// 	#define MR_KCP_CMD_CONNECT 1
+// #define MR_KCP_CMD_SEND 2
+// #define MR_KCP_CMD_CLOSE 3
+
+static int handle_bind_write(struct mr_kcp_socket* bind_skt, struct mr_message* msg){
+	if (msg->uid == MR_KCP_CMD_CLOSE){
+
+
+	}else if (msg->uid == MR_KCP_CMD_CONNECT){
+		const char* udp_address = (const char*)msg->buffer;
+		struct mr_kcp_socket* accept_skt = get_accept_socket(bind_skt, udp_address, SOCKET_TYPE_BACCEPT);
+		if (!accept_skt){
+			fprintf(stderr, "[WARN]handle_bind_write accept_skt == NULL, bind_skt->kcp_fd=%d \n", bind_skt->kcp_fd);
+			KCPASSERT(0);
+			return -1;
+	    }
+	}else{
+		fprintf(stderr, "[WARN]handle_bind_write Unknown:%ld\n", msg->uid);
+		KCPASSERT(0);
+	}
+    return 0;
+}
+
 static int handle_accept_write(struct mr_kcp_socket* accept_skt, struct mr_message* msg){
 	// printf("handle_accept_write accept_skt->kcp_fd=%d,accept_skt->type=%d, uid=%lld, ud=%d \n", accept_skt->kcp_fd, accept_skt->type, msg->uid, msg->ud);
-	assert(accept_skt->kcp_fd ==  msg->kcp_fd);
-	assert(accept_skt->type == SOCKET_TYPE_BACCEPT || accept_skt->type == SOCKET_TYPE_CACCEPT);
-	int ret = ikcp_send(accept_skt->kcp, msg->buffer, msg->ud);
-    if (ret < 0){
-        fprintf(stderr, "handle_accept_write fail! code:%d \n",ret);
-        assert(0);
-        return -1;
-    }
+	// assert(accept_skt->kcp_fd ==  msg->kcp_fd);
+	// assert(accept_skt->type == SOCKET_TYPE_BACCEPT || accept_skt->type == SOCKET_TYPE_CACCEPT);
+	if (msg->uid == MR_KCP_CMD_SEND){
+		int ret = ikcp_send(accept_skt->kcp, msg->buffer, msg->ud);
+	    if (ret < 0){
+	        fprintf(stderr, "handle_accept_write fail! code:%d \n",ret);
+	        KCPASSERT(0);
+	        return -1;
+	    }
+	}else if (msg->uid == MR_KCP_CMD_CLOSE){
+
+	}else{
+
+	}
 	return 0;
 }
 
@@ -659,27 +697,24 @@ void timer_callback(struct mr_timer* timer, void* args) {
 }
 
 static void *thread_kcp_socket_handle(void* p) {
+	struct mr_kcp_server* svr = MR_KCP_SERVER;
+   	assert(svr);
+    struct mr_timer* timer = svr->timer;
+    timer->time = 0;
+
     struct mr_slist_node* node;
     struct mr_message* msg;
-    uint32_t cur_time;
-    uint32_t next_time;
-
-    struct mr_kcp_server* kcp_svr = MR_KCP_SERVER;
-    struct mr_timer* timer = kcp_svr->timer;
-    timer->time = 0;
-    cur_time = 0;
-
-    uint32_t start_ts;
-    uint32_t tmp_ts;
-    uint32_t delta_ts;
+    uint32_t cur_time = 0;
+    uint32_t next_time = 0;
+    uint32_t start_ts, tmp_ts, delta_ts;
     while(1){
     	start_ts = mr_clock();
 
     	cur_time++;
-    	if(!mr_slist_is_empty(&kcp_svr->rd_list)){
-    		spinlock_lock(&kcp_svr->rd_lock);
-    		node = mr_slist_clear(&kcp_svr->rd_list);
-    		spinlock_unlock(&kcp_svr->rd_lock);
+    	if(!mr_slist_is_empty(&svr->rd_list)){
+    		spinlock_lock(&svr->rd_lock);
+    		node = mr_slist_clear(&svr->rd_list);
+    		spinlock_unlock(&svr->rd_lock);
 
     		struct mr_kcp_socket* bind_skt;
     		struct mr_kcp_socket* accept_skt;
@@ -702,17 +737,17 @@ static void *thread_kcp_socket_handle(void* p) {
 		       	FREE(msg);
 		    }
     	}
-    	if(!mr_slist_is_empty(&kcp_svr->wt_list)){
-    		spinlock_lock(&kcp_svr->wt_lock);
-    		node = mr_slist_clear(&kcp_svr->wt_list);
-    		spinlock_unlock(&kcp_svr->wt_lock);
+    	if(!mr_slist_is_empty(&svr->wt_list)){
+    		spinlock_lock(&svr->wt_lock);
+    		node = mr_slist_clear(&svr->wt_list);
+    		spinlock_unlock(&svr->wt_lock);
 
     		struct mr_kcp_socket* skt;
     		while(node){
 		    	msg = (struct mr_message*)node;
 		    	node = node->next;
 
-				skt = &kcp_svr->slot[HASH_ID(msg->kcp_fd)];
+				skt = &svr->slot[HASH_ID(msg->kcp_fd)];
 				assert(skt->kcp_fd == msg->kcp_fd);
 				if (skt->type == SOCKET_TYPE_BACCEPT || skt->type == SOCKET_TYPE_CACCEPT) {
 					if(handle_accept_write(skt, msg) == 0){
@@ -725,7 +760,7 @@ static void *thread_kcp_socket_handle(void* p) {
 					handle_bind_write(skt, msg);
 				}else{
 					fprintf(stderr, "[WARN]Unknown socket type = %d.\n", skt->type);
-					assert(0);
+					KCPASSERT(0);
 				}
 		    	if(msg->buffer){
 		    		FREE(msg->buffer);
@@ -782,7 +817,7 @@ static int mr_socket_kcp_poll(void) {
 		default:
 			if (type != -1){
 				fprintf(stderr, "Unknown socket message type = %d.\n",type);
-				assert(0);
+				KCPASSERT(0);
 			}
 			return -1;
 	}
