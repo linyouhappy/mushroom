@@ -13,8 +13,8 @@ void mr_socket_kcp_free(void);
 
 void mr_kcp_set_handle_data(mr_kcp_callback cb);
 void mr_kcp_set_handle_close(mr_kcp_callback cb);
-void mr_kcp_set_handle_baccept(mr_kcp_callback cb);
-void mr_kcp_set_handle_caccept(mr_kcp_callback cb);
+void mr_kcp_set_handle_connect(mr_kcp_callback cb);
+void mr_kcp_set_handle_accept(mr_kcp_callback cb);
 void mr_kcp_set_handle_error(mr_kcp_callback cb);
 void mr_kcp_set_handle_warning(mr_kcp_callback cb);
 
@@ -27,7 +27,7 @@ int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port);
 int mr_socket_kcp_send(int kcp_fd, const void* buffer, int sz);
 
 int mr_socket_kcp_close(int kcp_fd);
-void mr_socket_kcp_shutdown(int kcp_fd);
+// void mr_socket_kcp_shutdown(int kcp_fd);
 
 // int mr_socket_send(int fd, void* buffer, int sz);
 

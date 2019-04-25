@@ -14,20 +14,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "mrsocket/mrsocket.h"
 
-#include "mrsocket/mr_time.h"
-#include "mrsocket/mr_buffer.h"
-#include "mrsocket/mr_code.h"
-#include "mrsocket/mr_socket.h"
-#include "mrsocket/mr_socket_kcp.h"
-#include "mrsocket/mr_mem.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 struct User{
     int id;
@@ -41,7 +29,7 @@ struct User{
 
 
 
-static void handle_kcp_baccept(uintptr_t uid, int fd, char* data, int ud){
+static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int accept_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == 0){
@@ -49,7 +37,9 @@ static void handle_kcp_baccept(uintptr_t uid, int fd, char* data, int ud){
         assert(0);
     }else if (user->type == 1){
         printf("[main]client handle_kcp_baccept data=%s \n", data);
-        int accept_fd = ud;
+        mr_socket_kcp_close(accept_fd);
+        return;
+
         user->snd_id = 0;
         user->rcv_id = 0;
 
@@ -76,7 +66,7 @@ static void handle_kcp_baccept(uintptr_t uid, int fd, char* data, int ud){
     }
 }
 
-static void handle_kcp_caccept(uintptr_t uid, int fd, char* data, int ud){
+static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int accept_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == 0){
@@ -84,7 +74,6 @@ static void handle_kcp_caccept(uintptr_t uid, int fd, char* data, int ud){
     }else if (user->type == 1){
         printf("[main]client handle_kcp_caccept data=%s \n", data);
         assert(0);
-        int accept_fd = ud;
         user->snd_id = 0;
         user->rcv_id = 0;
 
@@ -180,15 +169,15 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
 
 int main(int argc, char* argv[])
 {
-    mr_mem_detect(1);
-    // mr_mem_check(21);
+    mr_mem_detect(0xFFFF);
+     // mr_mem_check(15);
     // mr_mem_check(22);
     
     mr_socket_kcp_init(0x11223344);
     mr_socket_kcp_run();
 
-    mr_kcp_set_handle_baccept(handle_kcp_baccept);
-    mr_kcp_set_handle_caccept(handle_kcp_caccept);
+    mr_kcp_set_handle_connect(handle_kcp_connect);
+    mr_kcp_set_handle_accept(handle_kcp_accept);
     mr_kcp_set_handle_data(handle_kcp_data);
 
     int port = 8765;
@@ -201,6 +190,7 @@ int main(int argc, char* argv[])
         assert(0);
     }
 	suser->bind_fd = server_fd;
+    mr_socket_kcp_close(server_fd);
 
    int i = 0;
    for (; i < 1000; ++i){
@@ -217,13 +207,13 @@ int main(int argc, char* argv[])
         port = 8765;
         mr_socket_kcp_connect(cbind_fd, "127.0.0.1", port);
         cuser->bind_fd = cbind_fd;
-        // break;
+        break;
     }
 
     while(1){
         mr_socket_kcp_update();
         mr_sleep(1);
-        mr_mem_info();
+        // mr_mem_info();
     }
     return 0;
 }

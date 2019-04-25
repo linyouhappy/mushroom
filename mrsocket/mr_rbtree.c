@@ -356,6 +356,22 @@ void mr_rbtree_destroy(struct mr_rbtree_root *root){
 	FREE(root);
 }
 
+static void each_rbtree(struct mr_rbtree_root *root, struct mr_rbtree_node* tree, void(*func)(struct mr_rbtree_root*, uintptr_t, uintptr_t)){
+	if(tree != NULL){
+        each_rbtree(root, tree->left, func);
+        if (func){
+        	func(root, tree->key, tree->value);
+        }
+        each_rbtree(root, tree->right, func);
+    }
+}
+
+void mr_rbtree_each(struct mr_rbtree_root *root, void(*func)(struct mr_rbtree_root*, uintptr_t, uintptr_t)){
+	if (root != NULL ){
+		each_rbtree(root, root->node, func);
+	}
+}
+
 
 // void mr_rbtree_test(void){
 	

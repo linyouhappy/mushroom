@@ -39,7 +39,7 @@ inline static void* fill_prefix(char* ptr, size_t size) {
 	if (uid < _max_uid){
 		uid_mems[uid] = (uint32_t)size;
 		if (check_mems[uid]){
-			printf("check_mems uid=%d\n", uid);
+			printf("fill_prefix check_mems uid=%d\n", uid);
 		}
 	}
 	// if (size >= 1024){
@@ -68,6 +68,9 @@ inline static void* clean_prefix(char* ptr) {
 	memcpy(&uid, &p->uid, sizeof(uid));
 	if (uid < _max_uid){
 		uid_mems[uid] = 0;
+		if (check_mems[uid]) {
+			printf("clean_prefix check_mems uid=%d\n", uid);
+		}
 	}
 	uint32_t dogtag;
 	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
@@ -111,7 +114,7 @@ void mr_mem_info(void){
 		 	}
 		 }
 	}
-	 printf("mr_mem_info used_memory=%dkb, memory_block=%d \n", _used_memory>>10, _memory_block);
+	printf("mr_mem_info used_memory=%dkb, memory_block=%d \n", _used_memory>>10, _memory_block);
 }
 
 void mr_mem_detect(uint32_t max_uid){
