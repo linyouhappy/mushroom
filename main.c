@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "mrsocket/mrsocket.h"
+#include "mrsocket.h"
 
 
 struct User{
@@ -33,12 +33,12 @@ static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int accept_fd)
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == 0){
-        printf("[main]server handle_kcp_baccept data=%s \n", data);
+        printf("[main]server handle_kcp_connect data=%s \n", data);
         assert(0);
     }else if (user->type == 1){
-        printf("[main]client handle_kcp_baccept data=%s \n", data);
-        mr_socket_kcp_close(accept_fd);
-        return;
+        printf("[main]client handle_kcp_connect data=%s \n", data);
+        // mr_socket_kcp_close(accept_fd);
+        // return;
 
         user->snd_id = 0;
         user->rcv_id = 0;
@@ -70,9 +70,9 @@ static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int accept_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == 0){
-        printf("[main]server handle_kcp_caccept data=%s \n", data);
+        printf("[main]server handle_kcp_accept data=%s \n", data);
     }else if (user->type == 1){
-        printf("[main]client handle_kcp_caccept data=%s \n", data);
+        printf("[main]client handle_kcp_accept data=%s \n", data);
         assert(0);
         user->snd_id = 0;
         user->rcv_id = 0;
@@ -167,6 +167,12 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
     }
 }
 
+
+static void handle_kcp_close(uintptr_t uid, int fd, char* data, int ud){
+    struct User* user = (struct User*)uid;
+    printf("[main]server handle_kcp_accept fd=%fd \n", fd);
+}
+
 int main(int argc, char* argv[])
 {
     mr_mem_detect(0xFFFF);
@@ -179,6 +185,7 @@ int main(int argc, char* argv[])
     mr_kcp_set_handle_connect(handle_kcp_connect);
     mr_kcp_set_handle_accept(handle_kcp_accept);
     mr_kcp_set_handle_data(handle_kcp_data);
+    mr_kcp_set_handle_close(handle_kcp_close);
 
     int port = 8765;
     struct User* suser = (struct User*)malloc(sizeof(struct User));

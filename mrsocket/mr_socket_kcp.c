@@ -274,12 +274,22 @@ void mr_socket_kcp_exit(void){
 
 }
 
-void mr_sokekt_kcp_wndsize(){
-
+static int kMSndwnd = 128;
+static int kMRcvwnd = 128;
+static int kMNodelay = 1;
+static int kMInterval = 10;
+static int kMResend = 10;
+static int kMNc = 1;
+void mr_sokekt_kcp_wndsize(int sndwnd, int rcvwnd){
+	kMSndwnd = sndwnd;
+	kMRcvwnd = rcvwnd;
 }
 
-void mr_sokekt_kcp_nodelay(){
-	
+void mr_sokekt_kcp_nodelay(int nodelay, int interval, int resend, int nc){
+	kMNodelay = nodelay;
+	kMInterval = interval;
+	kMResend = resend;
+	kMNc = nc;
 }
 
 static int kcp_output(const char *buffer, int len, ikcpcb *kcp, void *user){
@@ -311,10 +321,10 @@ static inline void kcp_create(struct mr_kcp_socket* skt){
     kcp->writelog = kcp_log;
     // kcp->logmask = -1
     // kcp->stream = 1;
-    ikcp_wndsize(kcp, 128, 128);
+    ikcp_wndsize(kcp, kMSndwnd, kMRcvwnd);
     // ikcp_nodelay(kcp, 0, 10, 0, 0);
     // ikcp_nodelay(kcp, 0, 10, 0, 1);
-    ikcp_nodelay(kcp, 1, 2, 10, 1);
+    ikcp_nodelay(kcp, kMNodelay, kMInterval, kMResend, kMNc);
     skt->kcp = kcp;
 }
 
@@ -533,7 +543,6 @@ void socket_kcp_close(struct mr_kcp_socket* skt){
 
 // void mr_socket_kcp_shutdown(int kcp_fd){
 // }
-
 int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 	struct mr_kcp_socket* skt = &MR_KCP_SERVER->slot[HASH_ID(kcp_fd)];
 	if (skt->kcp_fd != kcp_fd) {
@@ -655,6 +664,9 @@ static struct mr_kcp_socket* get_accept_socket(struct mr_kcp_socket* bind_skt, c
 }
 
 static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message* msg){
+	if (accept_skt->kcp->state != 0){
+		accept_skt->kcp->state = 0;
+	}
 	// printf("kcp_handle_read accept_skt->kcp_fd=%d,accept_skt->type=%d, uid=%lld, ud=%d \n", accept_skt->kcp_fd, accept_skt->type, msg->uid, msg->ud);
     int len = ikcp_input(accept_skt->kcp, msg->buffer, msg->ud);
     if (len < 0){
@@ -772,6 +784,15 @@ static void timer_callback(struct mr_timer* timer, void* args) {
 	    uint32_t next_time = ikcp_check(skt->kcp, cur_time);
 	    assert(next_time >= cur_time);
 	    skt->timer_time = 0;
+	    if (skt->kcp->state != 0){
+	    	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
+			msg->kcp_fd = skt->kcp_fd;
+			msg->uid = MR_KCP_CMD_CLOSE;
+			msg->ud = 0;
+			msg->buffer = NULL;
+			send_write_message(msg);
+	    	return;
+	    }
 	    if (ikcp_waitsnd(skt->kcp) > 0){
 	    	kcp_socket_addtimer(timer, skt, next_time);
 	    }
@@ -793,6 +814,9 @@ static void *thread_kcp_socket_handle(void* p) {
     struct mr_kcp_socket* bind_skt;
     struct mr_kcp_socket* accept_skt;
     struct mr_kcp_socket* skt;
+
+    struct socket_server* skt_svr = SOCKET_SERVER;
+
     while(1){
     	start_ts = mr_clock();
 
@@ -807,13 +831,27 @@ static void *thread_kcp_socket_handle(void* p) {
 		    	node = node->next;
 
 				bind_skt = &MR_KCP_SERVER->slot[HASH_ID(msg->kcp_fd)];
-    			if(bind_skt->fd == msg->fd && bind_skt->type == SOCKET_TYPE_BIND){
-    				accept_skt = get_accept_socket(bind_skt, (const char*)(msg->buffer + msg->ud), SOCKET_TYPE_ACCEPT);
-					kcp_handle_read(accept_skt, msg);
-		            ikcp_update(accept_skt->kcp, cur_time);
-		            next_time = ikcp_check(accept_skt->kcp, cur_time);
-			        assert(next_time >= cur_time);
-			        kcp_socket_addtimer(timer, accept_skt, next_time);
+    			if(bind_skt->fd == msg->fd){
+    				if (msg->type == SOCKET_UDP){
+    					if (bind_skt->type == SOCKET_TYPE_BIND){
+    						accept_skt = get_accept_socket(bind_skt, (const char*)(msg->buffer + msg->ud), SOCKET_TYPE_ACCEPT);
+							kcp_handle_read(accept_skt, msg);
+				            ikcp_update(accept_skt->kcp, cur_time);
+				            next_time = ikcp_check(accept_skt->kcp, cur_time);
+					        assert(next_time >= cur_time);
+					        kcp_socket_addtimer(timer, accept_skt, next_time);
+    					}else{
+    						fprintf(stderr, "[WARN]bind socket is closed. kcp_fd = %d, fd= %d \n", msg->kcp_fd, msg->fd);
+    						KCPASSERT(0);
+    					}
+    				}else if (msg->type == SOCKET_CLOSE){
+    					if (bind_skt->type == SOCKET_TYPE_BCLOSE){
+    						socket_kcp_close(bind_skt);
+    					}else{
+    						fprintf(stderr, "[WARN]bind socket is closed. kcp_fd = %d, fd= %d \n", msg->kcp_fd, msg->fd);
+    						KCPASSERT(0);
+    					}
+    				}
     			}else{
     				fprintf(stderr, "[WARN]bind socket is closed. kcp_fd = %d, fd= %d \n", msg->kcp_fd, msg->fd);
     				KCPASSERT(0);
@@ -876,8 +914,9 @@ static void *thread_kcp_socket_handle(void* p) {
 	return NULL;
 }
 
-static void forward_message(struct socket_message * result) {
+static void forward_message(int type, struct socket_message * result) {
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
+	msg->type = type;
 	msg->fd = result->id;
 	msg->kcp_fd = result->opaque;
 	// msg->uid = 0;
@@ -899,9 +938,10 @@ static int mr_socket_kcp_poll(void) {
 		case SOCKET_EXIT:
 			return 0;
 		case SOCKET_UDP:
-			forward_message(&result);
+			forward_message(type, &result);
 			break;
 		case SOCKET_CLOSE:
+			forward_message(type, &result);
 			break;
 		default:
 			if (type != -1){
