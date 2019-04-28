@@ -37,6 +37,8 @@ struct mr_buffer* mr_buffer_create(int head_len){
 }
 
 void mr_buffer_free(struct mr_buffer* buffer){
+	if (!buffer) return;
+		
 	struct mr_buffer_node* bnode;
 	while(buffer->head != NULL){
 		bnode = buffer->head;

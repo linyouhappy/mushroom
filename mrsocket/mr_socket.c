@@ -50,7 +50,7 @@ struct mr_message {
 	char* buffer;
 	int ud;
 	char* option;
-	char info[1];
+	char* info;
 };
 
 static struct socket_server * SOCKET_SERVER = NULL;
@@ -210,24 +210,28 @@ void mr_socket_update(void){
 
 static void forward_message(int type, bool padding, struct socket_message * result) {
 	// printf("forward_message type=%d\n", type);
-	struct mr_message* msg;
-	int sz = (int)sizeof(struct mr_message);
+	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
+	msg->type = type;
+	msg->fd = result->id;
+	msg->ud = result->ud;
+	msg->uid = result->opaque;
+
 	if (padding) {
 		if (result->data) {
 			int msg_sz = (int)strlen(result->data);
 			if (msg_sz > 128) {
 				msg_sz = 128;
 			}
-			sz += msg_sz;
+			msg->info = (char*)MALLOC(msg_sz+1);
+			memcpy(msg->info, result->data, msg_sz);
+
+			// sz += msg_sz;
 		} else {
 			result->data = "";
 		}
 	}
-	msg = (struct mr_message*)MALLOC(sz+1);
-	msg->type = type;
-	msg->fd = result->id;
-	msg->ud = result->ud;
-	msg->uid = result->opaque;
+	msg = (struct mr_message*)MALLOC(sz+2);
+	
 	msg->option = NULL;
 	if (padding) {
 		msg->buffer = NULL;

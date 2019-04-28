@@ -27,8 +27,8 @@ SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin CACHE PATH "Single 
 include_directories(${PROJECT_SOURCE_DIR}/${LIBMRSOCKET})
 add_subdirectory(${PROJECT_SOURCE_DIR}/${LIBMRSOCKET})
 
-include_directories(${PROJECT_SOURCE_DIR}/include)
-link_directories(${PROJECT_BINARY_DIR}/${LIBMRSOCKET})
+#include_directories(${PROJECT_SOURCE_DIR}/include)
+#link_directories(${PROJECT_BINARY_DIR}/${LIBMRSOCKET})
 
 if(WIN32)
 link_libraries(ws2_32)
@@ -41,11 +41,11 @@ endif()
 #target_link_libraries(${APP_NAME} ${LIBMRSOCKET})
 
 
-#test
+#examples
 #==============================
-add_executable(tcp_client test/tcp/client.c)
+add_executable(tcp_client examples/tcp/client.c)
 target_link_libraries(tcp_client ${LIBMRSOCKET})
-add_executable(tcp_server test/tcp/server.c)
+add_executable(tcp_server examples/tcp/server.c)
 target_link_libraries(tcp_server ${LIBMRSOCKET})
 
 

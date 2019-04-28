@@ -16,6 +16,8 @@ struct User{
 };
 
 
+
+
 void handle_data(uintptr_t uid, int fd, char* data, int size)
 {
     struct User* user = (struct User*)uid;
@@ -96,9 +98,9 @@ void handle_warning(uintptr_t uid, int fd, char* data, int ud)
     printf("[main]handle_warning uid = %lld, fd = %d, data = %s \n", uid, fd, data);
 }
 
-#define TEST_CLIENT_NUM 60
-// #define TEST_SERVER_IP "127.0.0.1"
-#define TEST_SERVER_IP "192.168.188.223"
+#define TEST_CLIENT_NUM 1
+#define TEST_SERVER_IP "127.0.0.1"
+//#define TEST_SERVER_IP "192.168.188.224"
 #define TEST_SERVER_PORT 8765
 
 int main(int argc, char* argv[])
