@@ -17,7 +17,10 @@ TCP、UDP通信来自skynet，然后在udp通信的基础上实现kcp协议，�
 
 1. 环境准备
 cmake构建工具，linux系统需要gcc编译器，window需要vs，macos/ios需要xcode，安卓需要ndk。 
-2. 可以通过git工具下载源代码。git clone https://github.com/linyouhappy/mushroom.git
+2. 可以通过git工具下载源代码。
+```
+git clone https://github.com/linyouhappy/mushroom.git
+```
 3. 创建build目录，在build目录下，再分别创建各个系统的build文件，linux,win或者macos
 在shell终端
 ```
@@ -26,6 +29,10 @@ cmake构建工具，linux系统需要gcc编译器，window需要vs，macos/ios�
 4. 用cmake构建工程
 以linux为例子，在shell终端，在上述/build/linxu下，cmake ../..
 在win或macos，cmake有可视化工具，鼠标点击即可构建。
+```
+#macosx cmake
+sudo xcode-select --switch /Applications/Xcode.app/
+```
 
 5. 编译项目
 以linux为例，在上个步骤下 make，就完成编译。执行tutorial这个demo程序就可以。
