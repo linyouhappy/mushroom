@@ -66,7 +66,6 @@ void server_handle_data(uintptr_t uid, int fd, char* data, int size)
 void server_handle_close(uintptr_t uid, int fd, char* data, int size)
 {
     printf("server_handle_close uid=%d\n", (int)uid);
-
     struct User* user = (struct User*)uid;
     if (user == serverUser)
     {

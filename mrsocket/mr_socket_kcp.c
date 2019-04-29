@@ -52,7 +52,6 @@
 #define MR_SOCKET_TYPE_WARNING 7
 #define MR_SOCKET_TYPE_COUNT 8
 
-
 #define MR_KCP_CMD_CONNECT 1
 #define MR_KCP_CMD_SEND 2
 #define MR_KCP_CMD_CLOSE 3
@@ -113,15 +112,10 @@ union sockaddr_all {
 static struct mr_kcp_server* MR_KCP_SERVER = NULL;
 static struct socket_server* SOCKET_SERVER = NULL;
 
-// void mr_kcp_set_handle(mr_kcp_callback cb){
-// 	assert(MR_KCP_SERVER && cb);
-// 	MR_KCP_SERVER->all_cb = cb;
-// }
 
 static void mr_kcp_handle_data(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket_kcp]mr_kcp_handle_data uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
-
 static void mr_kcp_handle_close(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket_kcp]mr_kcp_handle_close uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }

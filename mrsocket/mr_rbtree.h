@@ -27,6 +27,5 @@ void mr_rbtree_remove(struct mr_rbtree_root *root, uintptr_t key);
 uintptr_t mr_rbtree_search(struct mr_rbtree_root *root, uintptr_t key);
 void mr_rbtree_each(struct mr_rbtree_root *root, void(*func)(struct mr_rbtree_root*, uintptr_t, uintptr_t));
 
-// void mr_rbtree_test(void);
 
 #endif
