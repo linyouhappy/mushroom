@@ -52,7 +52,7 @@ void mr_buffer_free(struct mr_buffer* buffer){
 	FREE(buffer);
 }
 
-int mr_buffer_push(struct mr_buffer* buffer, char* msg, size_t len){
+int mr_buffer_read_push(struct mr_buffer* buffer, char* msg, size_t len){
 	if (msg == NULL || len <= 0){
 		return -1;
 	}
@@ -223,37 +223,3 @@ int mr_buffer_write_pack(struct mr_buffer* buffer, char* data, size_t len) {
 	}
 	return buffer->write_len;
 }
-
-
-// void mr_buffer_test(){
-// 	struct mr_buffer* buffer = mr_buffer_create(4);
-
-// 	char test_data1[32] = {6,2};
-// 	mr_buffer_push(buffer, test_data1, strlen(test_data1));
-
-// 	char test_data2[32] = {1, 2, 3, 4,'1','2','3','4','5','6'};
-// 	mr_buffer_push(buffer, test_data2, strlen(test_data2));
-
-// 	char test_data3[32] = {'a','b','c','d','e','f'};
-// 	mr_buffer_push(buffer, test_data3, strlen(test_data3));
-
-// 	char test_data4[32] = {'g','h','i','j','k','l'};
-// 	mr_buffer_push(buffer, test_data4, strlen(test_data4));
-
-// 	int byte3 = mr_buffer_read_header(buffer, 3);
-// 	int byte2 = mr_buffer_read_header(buffer, 2);
-// 	int byte1 = mr_buffer_read_header(buffer, 1);
-// 	assert(byte1 == 4);
-
-// 	char read_data[19] = {0};
-// 	mr_buffer_read(buffer, read_data, 15);
-
-// 	mr_buffer_read(buffer, read_data, 3);
-// 	assert(mr_buffer_size(buffer) == 0);
-
-// 	char test_data[64] = {'1','2','3','4','5','6'};
-// 	mr_buffer_write_pack(buffer, test_data, (int)strlen(test_data));
-// 	mr_buffer_push(buffer, buffer->pack_data, buffer->pack_len);
-// 	mr_buffer_read_pack(buffer);
-// 	assert(memcmp(test_data, buffer->pack_data, buffer->pack_len) == 0);
-// }

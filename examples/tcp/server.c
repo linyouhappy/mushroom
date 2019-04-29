@@ -36,7 +36,7 @@ void server_handle_data(uintptr_t uid, int fd, char* data, int size)
 
     struct User* user = (struct User*)uid;
     struct mr_buffer* buffer = user->buffer;
-    mr_buffer_push(buffer, data, size);
+    mr_buffer_read_push(buffer, data, size);
     int ret = mr_buffer_read_pack(buffer);
     if (ret > 0){
         const char* ptr = buffer->read_data;

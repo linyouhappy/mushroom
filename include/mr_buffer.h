@@ -32,12 +32,11 @@ struct mr_buffer {
 
 struct mr_buffer* mr_buffer_create(int head_len);
 void mr_buffer_free(struct mr_buffer* buffer);
-int mr_buffer_push(struct mr_buffer* buffer, char* msg, size_t len);
+int mr_buffer_read_push(struct mr_buffer* buffer, char* msg, size_t len);
 int mr_buffer_read_header(struct mr_buffer* buffer, size_t len);
 int mr_buffer_read(struct mr_buffer* buffer, char* data, int len);
 int mr_buffer_read_pack(struct mr_buffer* buffer);
 int mr_buffer_write_pack(struct mr_buffer* buffer, char* data, size_t len);
 
-void mr_buffer_test();
 
 #endif

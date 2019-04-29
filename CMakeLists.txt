@@ -47,11 +47,16 @@ endif()
 
 
 #examples
-#==============================
+#tcp===========================
 add_executable(tcp_client examples/tcp/client.c)
 target_link_libraries(tcp_client ${LIBMRSOCKET})
 add_executable(tcp_server examples/tcp/server.c)
 target_link_libraries(tcp_server ${LIBMRSOCKET})
+
+#codebuffer===========================
+add_executable(codebuffer examples/codebuffer.c)
+target_link_libraries(codebuffer ${LIBMRSOCKET})
+
 
 
 #file(GLOB APP_SOURCES app/*.cxx)
