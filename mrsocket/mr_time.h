@@ -8,6 +8,7 @@
 #include <windows.h>
 #else
 #include <sys/time.h>
+#include <unistd.h>
 #endif
 
 static inline void mr_timeofday(long *sec, long *usec){

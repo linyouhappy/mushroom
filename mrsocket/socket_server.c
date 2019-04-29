@@ -20,6 +20,7 @@
 #include "win/spinlock.h"
 
 #define ssize_t size_t
+#define _CRT_SECURE_NO_WARNINGS
 
 #else
 

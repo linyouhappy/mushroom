@@ -10,7 +10,6 @@
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 #include "win/winport.h"
 #include "win/spinlock.h"
-// #include "win/inet.h"
 #else
 #include <pthread.h>
 #include <sys/socket.h>
@@ -28,18 +27,18 @@
 #define MR_SOCKET_TYPE_DATA 1
 #define MR_SOCKET_TYPE_CONNECT 2
 #define MR_SOCKET_TYPE_CLOSE 3
-#define MR_SOCKET_TYPE_ACCEPT 4
-#define MR_SOCKET_TYPE_ERROR 5
-#define MR_SOCKET_TYPE_WARNING 6
-#define MR_SOCKET_TYPE_COUNT 7
+#define MR_SOCKET_TYPE_ERROR 4
+#define MR_SOCKET_TYPE_WARNING 5
+#define MR_SOCKET_TYPE_COUNT 6
+#define MR_SOCKET_TYPE_ACCEPT 7
 #define MR_SOCKET_TYPE_UDP 8
 
 struct mr_socket {
 	struct mr_slist msg_list;
 	struct spinlock list_lock;
-	mr_callback cbs[MR_SOCKET_TYPE_COUNT];
+	mr_callback4 cbs[MR_SOCKET_TYPE_COUNT];
+	mr_callback5 apt_bc;
 	mr_udp_callback udpcb;
-	// mr_udp_callback all_cb;
 };
 
 struct mr_message {
@@ -47,15 +46,15 @@ struct mr_message {
 	int type;
 	int fd;
 	uintptr_t uid;
-	char* buffer;
 	int ud;
+	char* buffer;
+	int size;
 	char* option;
-	char* info;
+	// char* info;
 };
 
 static struct socket_server * SOCKET_SERVER = NULL;
 static struct mr_socket * MR_SOCKET = NULL;
-
 
 static void mr_handle_data(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket]mr_handle_data uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
@@ -66,9 +65,9 @@ static void mr_handle_connect(uintptr_t uid, int fd, char* data, int size){
 static void mr_handle_close(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket]mr_handle_close uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
-static void mr_handle_accept(uintptr_t uid, int fd, char* data, int accept_fd){
-    printf("[mr_socket]mr_handle_accept uid=%d fd =%d accept_fd=%d data=%s\n", (int)uid, fd, accept_fd, data);
-    mr_socket_start(uid, accept_fd);
+static void mr_handle_accept(uintptr_t uid, int fd, char* data, int size, int apt_fd){
+    printf("[mr_socket]mr_handle_accept uid=%d fd =%d accept_fd=%d data=%s\n", (int)uid, fd, apt_fd, data);
+    mr_socket_start(uid, apt_fd);
 }
 static void mr_handle_error(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket]mr_handle_error uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
@@ -96,38 +95,37 @@ void mr_socket_init(void) {
 	mr_slist_clear(&MR_SOCKET->msg_list);
 	spinlock_init(&MR_SOCKET->list_lock);
 
-	mr_callback* cbs = MR_SOCKET->cbs;
+	mr_callback4* cbs = MR_SOCKET->cbs;
 	cbs[MR_SOCKET_TYPE_DATA] = mr_handle_data;
 	cbs[MR_SOCKET_TYPE_CONNECT] = mr_handle_connect;
 	cbs[MR_SOCKET_TYPE_CLOSE] = mr_handle_close;
-	cbs[MR_SOCKET_TYPE_ACCEPT] = mr_handle_accept;
 	cbs[MR_SOCKET_TYPE_ERROR] = mr_handle_error;
 	cbs[MR_SOCKET_TYPE_WARNING] = mr_handle_warning;
-
+	MR_SOCKET->apt_bc = mr_handle_accept;
 	MR_SOCKET->udpcb = mr_handle_udp;
 }
 
-void mr_set_handle_data(mr_callback cb){
+void mr_set_handle_data(mr_callback4 cb){
 	assert(SOCKET_SERVER && cb);
 	MR_SOCKET->cbs[MR_SOCKET_TYPE_DATA] = cb;
 }
-void mr_set_handle_connect(mr_callback cb){
+void mr_set_handle_connect(mr_callback4 cb){
 	assert(SOCKET_SERVER && cb);
 	MR_SOCKET->cbs[MR_SOCKET_TYPE_CONNECT] = cb;
 }
-void mr_set_handle_close(mr_callback cb){
+void mr_set_handle_close(mr_callback4 cb){
 	assert(SOCKET_SERVER && cb);
 	MR_SOCKET->cbs[MR_SOCKET_TYPE_CLOSE] = cb;
 }
-void mr_set_handle_accept(mr_callback cb){
+void mr_set_handle_accept(mr_callback5 cb){
 	assert(SOCKET_SERVER && cb);
-	MR_SOCKET->cbs[MR_SOCKET_TYPE_ACCEPT] = cb;
+	MR_SOCKET->apt_bc = cb;
 }
-void mr_set_handle_error(mr_callback cb){
+void mr_set_handle_error(mr_callback4 cb){
 	assert(SOCKET_SERVER && cb);
 	MR_SOCKET->cbs[MR_SOCKET_TYPE_ERROR] = cb;
 }
-void mr_set_handle_warning(mr_callback cb){
+void mr_set_handle_warning(mr_callback4 cb){
 	assert(SOCKET_SERVER && cb);
 	MR_SOCKET->cbs[MR_SOCKET_TYPE_WARNING] = cb;
 }
@@ -135,11 +133,6 @@ void mr_set_handle_udp(mr_udp_callback cb){
 	assert(SOCKET_SERVER && cb);
 	MR_SOCKET->udpcb = cb;
 }
-
-// void mr_set_handle(mr_udp_callback cb){
-// 	assert(SOCKET_SERVER && cb);
-// 	MR_SOCKET->all_cb = cb;
-// }
 
 void mr_socket_clear(void) {
 	assert(MR_SOCKET);
@@ -185,21 +178,19 @@ void mr_socket_update(void){
     spinlock_unlock(&MR_SOCKET->list_lock);
 
     assert(node != NULL);
-
-    char* buffer;
     struct mr_message* msg;
+    char* buffer;
     while(node){
     	msg = (struct mr_message*)node;
     	node = node->next;
 
-    	buffer = msg->buffer == NULL ? msg->info : msg->buffer;
-      	// if (MR_SOCKET->all_cb){
-      	// 	MR_SOCKET->all_cb(msg->uid, msg->fd, buffer, msg->ud, msg->option);
-      	// }
+    	buffer = msg->buffer == NULL?"":msg->buffer;
       	if (msg->type == MR_SOCKET_TYPE_UDP) {
-      		MR_SOCKET->udpcb(msg->uid, msg->fd, buffer, msg->ud, msg->option);
+      		MR_SOCKET->udpcb(msg->uid, msg->fd, buffer, msg->size, msg->option);
+      	}else if (msg->type == MR_SOCKET_TYPE_ACCEPT) {
+			MR_SOCKET->apt_bc(msg->uid, msg->fd, msg->buffer, msg->size, msg->ud);
       	}else{
-      		MR_SOCKET->cbs[msg->type](msg->uid, msg->fd, buffer, msg->ud);
+      		MR_SOCKET->cbs[msg->type](msg->uid, msg->fd, msg->buffer, msg->size);
       	}
       	if (msg->buffer){
       		FREE(msg->buffer);
@@ -209,43 +200,34 @@ void mr_socket_update(void){
 }
 
 static void forward_message(int type, bool padding, struct socket_message * result) {
-	// printf("forward_message type=%d\n", type);
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->type = type;
 	msg->fd = result->id;
 	msg->ud = result->ud;
 	msg->uid = result->opaque;
-
-	if (padding) {
-		if (result->data) {
-			int msg_sz = (int)strlen(result->data);
-			if (msg_sz > 128) {
+	if (padding){
+		if (result->data){
+			size_t msg_sz = strlen(result->data);
+			if (msg_sz > 128){
 				msg_sz = 128;
 			}
-			msg->info = (char*)MALLOC(msg_sz+1);
-			memcpy(msg->info, result->data, msg_sz);
-
-			// sz += msg_sz;
-		} else {
-			result->data = "";
+			msg->size = msg_sz+1;
+			msg->buffer = (char*)MALLOC(msg->size);
+			memset(msg->buffer, 0, msg->size);
+			memcpy(msg->buffer, result->data, msg->size);
+		}else{
+			msg->buffer = NULL;
+			msg->size = 0;
 		}
-	}
-	msg = (struct mr_message*)MALLOC(sz+2);
-	
-	msg->option = NULL;
-	if (padding) {
-		msg->buffer = NULL;
-		int len = sz - (int)sizeof(struct mr_message);
-		memcpy(msg->info, result->data, len);
-		msg->info[len] = 0;
-	} else {
+	}else{
 		msg->buffer = result->data;
-		msg->info[0] = 0;
+		msg->size = result->ud;
+		msg->ud = 0;
 		if (msg->type == MR_SOCKET_TYPE_UDP) {
 			msg->option = msg->buffer + msg->ud;
 		}
 	}
-	
+
 	spinlock_lock(&MR_SOCKET->list_lock);
 	mr_slist_link(&MR_SOCKET->msg_list, (struct mr_slist_node*)msg);
 	spinlock_unlock(&MR_SOCKET->list_lock);

@@ -6,8 +6,8 @@
 #define SPIN_UNLOCK(q) spinlock_unlock(&(q)->lock);
 #define SPIN_DESTROY(q) spinlock_destroy(&(q)->lock);
 
-// #include "winport.h"
-//#include <windows.h>
+#include "winport.h"
+#include <windows.h>
 
 struct spinlock {
     CRITICAL_SECTION lock;

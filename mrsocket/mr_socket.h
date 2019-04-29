@@ -4,19 +4,19 @@
 #include "socket_info.h"
 
 
-typedef void (*mr_callback)(uintptr_t, int, char*, int);
+typedef void (*mr_callback4)(uintptr_t, int, char*, int);
+typedef void (*mr_callback5)(uintptr_t, int, char*, int, int);
 typedef void (*mr_udp_callback)(uintptr_t, int, char*, int, char*);
 
 void mr_socket_run(void);
 
-void mr_set_handle_data(mr_callback cb);
-void mr_set_handle_connect(mr_callback cb);
-void mr_set_handle_close(mr_callback cb);
-void mr_set_handle_accept(mr_callback cb);
-void mr_set_handle_error(mr_callback cb);
-void mr_set_handle_warning(mr_callback cb);
+void mr_set_handle_data(mr_callback4 cb);
+void mr_set_handle_connect(mr_callback4 cb);
+void mr_set_handle_close(mr_callback4 cb);
+void mr_set_handle_accept(mr_callback5 cb);
+void mr_set_handle_error(mr_callback4 cb);
+void mr_set_handle_warning(mr_callback4 cb);
 void mr_set_handle_udp(mr_udp_callback cb);
-// void mr_set_handle(mr_udp_callback cb);
 
 void mr_socket_update(void);
 

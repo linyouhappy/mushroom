@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #endif
 
 #include "mr_slist.h"
@@ -561,7 +562,7 @@ int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 
 	char* buffer = (char*)MALLOC(UDP_ADDRESS_SIZE);
 	memset(buffer, 0, UDP_ADDRESS_SIZE);
-	msg->ud = convert_udp_address(addr, port, buffer);
+	msg->ud = convert_udp_address(addr, port, (uint8_t*)buffer);
 	msg->buffer = buffer;
 	send_write_message(msg);
 	// printf("mr_socket_kcp_connect kcp_fd=%d, addr=%s, port=%d, fd=%d\n", kcp_fd, addr, port, skt->fd);
@@ -630,7 +631,7 @@ static struct mr_kcp_socket* create_accept_socket(struct mr_kcp_socket* bind_skt
 	mr_rbtree_insert(bind_skt->rbtree, (uintptr_t)accept_skt->udp_address, (uintptr_t)accept_skt);
 
 	char udp_addr[128] = {0};
-	mr_socket_kcp_udp_address(accept_skt->udp_address, udp_addr, sizeof(udp_addr));
+	mr_socket_kcp_udp_address((const char*)accept_skt->udp_address, udp_addr, (int)sizeof(udp_addr));
 	printf("create_accept_socket accept_skt udp_addr =%s \n", udp_addr);
 	printf("create_accept_socket bind_skt->kcp_fd=%d, accept_skt->kcp_fd=%d, accept_skt->type=%d \n", bind_skt->kcp_fd, accept_skt->kcp_fd, accept_skt->type);
 
@@ -814,9 +815,6 @@ static void *thread_kcp_socket_handle(void* p) {
     struct mr_kcp_socket* bind_skt;
     struct mr_kcp_socket* accept_skt;
     struct mr_kcp_socket* skt;
-
-    struct socket_server* skt_svr = SOCKET_SERVER;
-
     while(1){
     	start_ts = mr_clock();
 

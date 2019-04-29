@@ -16,10 +16,17 @@ struct User{
 };
 
 
+//60 connections
+#define TEST_CLIENT_NUM 60
+//#define TEST_SERVER_IP "127.0.0.1"
+#define TEST_SERVER_IP "192.168.188.224"
+#define TEST_SERVER_PORT 8765
+struct User* users[TEST_CLIENT_NUM] = {0};
 
 
-void handle_data(uintptr_t uid, int fd, char* data, int size)
+static void client_handle_data(uintptr_t uid, int fd, char* data, int size)
 {
+    printf("client_handle_data uid = %d, fd = %d, size = %d \n", (int)uid, fd, size);
     struct User* user = (struct User*)uid;
     struct mr_buffer* buffer = user->buffer;
     mr_buffer_push(buffer, data, size);
@@ -54,8 +61,10 @@ void handle_data(uintptr_t uid, int fd, char* data, int size)
     }
 }
 
-void handle_connect(uintptr_t uid, int fd, char* data, int ud)
+static void client_handle_connect(uintptr_t uid, int fd, char* data, int size)
 {
+    printf("client_handle_connect uid = %d, fd = %d, data =%s, size = %d \n", (int)uid, fd, data, size);
+
     struct User* user = (struct User*)uid;
     user->snd_id = 0;
     user->rcv_id = 0;
@@ -82,39 +91,33 @@ void handle_connect(uintptr_t uid, int fd, char* data, int ud)
    }
 }
 
-
-void handle_close(uintptr_t uid, int fd, char* data, int ud)
+static void client_handle_close(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("[main]handle_close uid=%lld\n", uid);
+    printf("client_handle_close uid = %d, fd = %d, data=%s, size = %d \n", (int)uid, fd, data, size);
 }
 
-void handle_error(uintptr_t uid, int fd, char* data, int ud)
+static void client_handle_error(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("[main]handle_error uid = %lld, fd = %d, data = %s \n", uid, fd, data);
+    printf("client_handle_error uid = %d, fd = %d, data=%s, size = %d \n", (int)uid, fd, data, size);
 }
 
-void handle_warning(uintptr_t uid, int fd, char* data, int ud)
+static void client_handle_warning(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("[main]handle_warning uid = %lld, fd = %d, data = %s \n", uid, fd, data);
+    printf("client_handle_warning uid = %d, fd = %d, data=%s, size = %d \n", (int)uid, fd, data, size);
 }
-
-#define TEST_CLIENT_NUM 1
-#define TEST_SERVER_IP "127.0.0.1"
-//#define TEST_SERVER_IP "192.168.188.224"
-#define TEST_SERVER_PORT 8765
 
 int main(int argc, char* argv[])
 {
     mr_socket_init();
     mr_socket_run();
 
-    mr_set_handle_data(handle_data);
-    mr_set_handle_connect(handle_connect);
-    mr_set_handle_close(handle_close);
-    mr_set_handle_error(handle_error);
-    mr_set_handle_warning(handle_warning);
+    mr_set_handle_data(client_handle_data);
+    mr_set_handle_connect(client_handle_connect);
+    mr_set_handle_close(client_handle_close);
+    mr_set_handle_error(client_handle_error);
+    mr_set_handle_warning(client_handle_warning);
 
-    struct User* users[TEST_CLIENT_NUM] = {0};
+
     int clent_count = TEST_CLIENT_NUM;
     int i = 0;
     for (i = 0; i < clent_count; ++i)
@@ -139,5 +142,7 @@ int main(int argc, char* argv[])
        mr_socket_update();
        mr_sleep(1);
     }
+
+
     return 0;
 }

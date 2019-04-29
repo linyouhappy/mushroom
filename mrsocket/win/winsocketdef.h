@@ -1,6 +1,7 @@
 #ifndef winsocketdef_h
 #define winsocketdef_h
 
+#include "win/winsocket.h"
 
 #ifndef DONOT_USE_IO_EXTEND
 #define write(fd, ptr, sz) write_extend_socket(fd, ptr, sz)

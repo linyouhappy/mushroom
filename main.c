@@ -6,7 +6,7 @@
 // #define __STDC_VERSION__ 199409L
 // #define __STDC_VERSION__ 199901L
 
-#define _CRT_SECURE_NO_WARNINGS
+
 
 
 #include <stdio.h>

@@ -32,7 +32,8 @@ void destroy_user(struct User* user){
 
 void server_handle_data(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("[main]server_handle_data uid =%lld \n", uid);
+    printf("[main]server_handle_data uid =%d \n", (int)uid);
+
     struct User* user = (struct User*)uid;
     struct mr_buffer* buffer = user->buffer;
     mr_buffer_push(buffer, data, size);
@@ -59,9 +60,10 @@ void server_handle_data(uintptr_t uid, int fd, char* data, int size)
     }
 }
 
-void server_handle_close(uintptr_t uid, int fd, char* data, int ud)
+void server_handle_close(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("server_handle_close uid=%lld\n", uid);
+    printf("server_handle_close uid=%d\n", (int)uid);
+
     struct User* user = (struct User*)uid;
     if (user == serverUser)
     {
@@ -81,9 +83,9 @@ void server_handle_close(uintptr_t uid, int fd, char* data, int ud)
     }
 }
 
-void server_handle_accept(uintptr_t uid, int fd, char* data, int accept_fd)
+void server_handle_accept(uintptr_t uid, int fd, char* data, int size, int apt_fd)
 {
-    // printf("server_handle_accept uid=%lld fd =%d accept_fd=%d data=%s\n", uid, fd, accept_fd, data);
+    printf("server_handle_accept uid=%d, fd=%d, data=%s, size=%d, apt_fd=%d \n", (int)uid, fd, data, size, apt_fd);
     int i = 0;
     for (; i < 0xffff; ++i)
     {
@@ -91,20 +93,22 @@ void server_handle_accept(uintptr_t uid, int fd, char* data, int accept_fd)
         {
             struct User* user = create_user();
             clientUsers[i] = user;
-            mr_socket_start((uintptr_t)user, accept_fd);
+            mr_socket_start((uintptr_t)user, apt_fd);
             return;
         }
     }
+    //too many client. refuse connect;
+    mr_socket_close(uid, apt_fd);
 }
 
-void server_handle_error(uintptr_t uid, int fd, char* data, int ud)
+void server_handle_error(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("server_handle_error uid = %lld, fd = %d, data = %s \n", uid, fd, data);
+    printf("server_handle_error uid = %d, fd = %d, data = %s, size=%d \n", (int)uid, fd, data, size);
 }
 
-void server_handle_warning(uintptr_t uid, int fd, char* data, int ud)
+void server_handle_warning(uintptr_t uid, int fd, char* data, int size)
 {
-    printf("server_handle_warning uid = %lld, fd = %d, data = %s \n", uid, fd, data);
+    printf("server_handle_warning uid = %d, fd = %d, data = %s, size=%d \n", (int)uid, fd, data, size);
 }
 
 #define TEST_SERVER_IP "0.0.0.0"

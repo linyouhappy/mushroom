@@ -75,7 +75,7 @@ inline static void* clean_prefix(char* ptr) {
 	uint32_t dogtag;
 	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
 	if (dogtag == MEMORY_FREETAG) {
-		fprintf(stderr, "xmalloc: double free in :%ld\n", uid);
+		fprintf(stderr, "xmalloc: double free in :%d\n", uid);
 	}
 	assert(dogtag == MEMORY_ALLOCTAG);
 	dogtag = MEMORY_FREETAG;
@@ -110,11 +110,11 @@ void mr_mem_info(void){
 		uint32_t uid = 0;
 		 for (; uid < _max_uid; ++uid){
 		 	if(uid_mems[uid]){
-		 		printf("mr_mem_info uid=%d, mem=%ld \n", uid, uid_mems[uid]);
+		 		printf("mr_mem_info uid=%d, mem=%d \n", uid, uid_mems[uid]);
 		 	}
 		 }
 	}
-	printf("mr_mem_info used_memory=%dkb, memory_block=%d \n", _used_memory>>10, _memory_block);
+	printf("mr_mem_info used_memory=%ldkb, memory_block=%ld \n", _used_memory>>10, _memory_block);
 }
 
 void mr_mem_detect(uint32_t max_uid){
