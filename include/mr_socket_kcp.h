@@ -26,6 +26,7 @@ int mr_socket_kcp(uintptr_t uid, const char* addr, int port);
 // void mr_socket_kcp_start(uintptr_t uid, int kcp_fd);
 int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port);
 int mr_socket_kcp_send(int kcp_fd, const void* buffer, int sz);
+int mr_socket_kcp_start(uintptr_t uid, int kcp_fd);
 
 int mr_socket_kcp_close(int kcp_fd);
 // void mr_socket_kcp_shutdown(int kcp_fd);

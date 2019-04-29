@@ -77,7 +77,6 @@ static void client_handle_kcp_connect(uintptr_t uid, int fd, char* data, int cnt
 // static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int apt_fd){
 //     printf("other client connect me\n");
 // }
-
 static void client_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
 {
     printf("client_handle_kcp_data uid=%d, fd=%d, size=%d \n", (int)uid, fd, size);
@@ -88,7 +87,7 @@ static void client_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
     int ret = mr_buffer_read_pack(buffer);
     if (ret > 0){
         const char* ptr = buffer->read_data;
-        int read_len = buffer->read_len;
+        // int read_len = buffer->read_len;
 
         uint32_t id = 0;
         ptr = mr_decode32u(ptr, &id);
@@ -119,8 +118,8 @@ static void client_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
 }
 
 static void client_handle_kcp_close(uintptr_t uid, int fd, char* data, int ud){
-    struct User* user = (struct User*)uid;
-    printf("client_handle_kcp_close uid=%d, fd=%d \n", uid, fd);
+    // struct User* user = (struct User*)uid;
+    printf("client_handle_kcp_close uid=%d, fd=%d \n", (int)uid, fd);
 }
 
 int main(int argc, char* argv[])
@@ -150,12 +149,21 @@ int main(int argc, char* argv[])
         user->bind_fd = bind_fd;
         user->fd = 0;
         clientUsers[i] = user;
+		break;
     }
 
     while(1){
         mr_socket_kcp_update();
         mr_sleep(1);
         // mr_mem_info();
+    }
+
+    i = 0;
+    for (; i < TEST_CLIENT_NUM; ++i){
+        if (clientUsers[i]){
+            destroy_user(clientUsers[i]);
+            clientUsers[i] = NULL;
+        }
     }
     return 0;
 }

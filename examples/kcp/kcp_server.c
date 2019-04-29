@@ -37,7 +37,7 @@ static void server_handle_kcp_accept(uintptr_t uid, int fd, char* data, int apt_
     assert(user->bind_fd == fd);
     assert(serverUser == user);
 
-    printf("server_handle_kcp_accept uid=%d, fd=%d, data=%s, size=%d, apt_fd=%d \n", (int)uid, fd, data, size, apt_fd);
+    printf("server_handle_kcp_accept uid=%d, fd=%d, data=%s, apt_fd=%d \n", (int)uid, fd, data, apt_fd);
     int i = 0;
     for (; i < 0xFFFF; ++i)
     {
@@ -45,7 +45,7 @@ static void server_handle_kcp_accept(uintptr_t uid, int fd, char* data, int apt_
         {
             struct User* user = create_user();
             clientUsers[i] = user;
-            // mr_socket_start((uintptr_t)user, apt_fd);
+            mr_socket_kcp_start((uintptr_t)user, apt_fd);
             return;
         }
     }
@@ -59,14 +59,14 @@ static void server_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
     int ret = mr_buffer_read_pack(buffer);
     if (ret > 0){
         const char* ptr = buffer->read_data;
-        int read_len = buffer->read_len;
+        // int read_len = buffer->read_len;
         uint32_t id = 0;
         ptr = mr_decode32u(ptr, &id);
         uint32_t time = 0;
         ptr = mr_decode32u(ptr, &time);
 
         uint32_t cur_time = mr_clock();
-        //MRLOG("[server]id = %d, costtime = %d \n", id, cur_time-time);
+        printf("[server]id = %d, costtime = %d \n", id, cur_time-time);
         assert(id%2 == 0);
         char* enptr = buffer->read_data;
         enptr = mr_encode32u(enptr, ++id);
@@ -79,9 +79,24 @@ static void server_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
     }
 }
 
-static void server_handle_kcp_close(uintptr_t uid, int fd, char* data, int ud){
+static void server_handle_kcp_close(uintptr_t uid, int fd, char* data, int ud)
+{
     struct User* user = (struct User*)uid;
-    printf("[main]server handle_kcp_accept fd=%fd \n", fd);
+    printf("[main]server handle_kcp_accept fd=%d \n", fd);
+    if (user == serverUser){
+        
+    }else{
+        int i = 0;
+        for (; i < 0xffff; ++i)
+        {
+            if (clientUsers[i] == user)
+            {
+                clientUsers[i] = NULL;
+                destroy_user(user);
+                return;
+            }
+        }
+    }
 }
 
 int main(int argc, char* argv[])
@@ -111,6 +126,17 @@ int main(int argc, char* argv[])
         mr_sleep(1);
         // mr_mem_info();
     }
+
+    int i = 0;
+    for (; i < 0xffff; ++i){
+        if (clientUsers[i]){
+            destroy_user(clientUsers[i]);
+            clientUsers[i] = NULL;
+        }
+    }
+    destroy_user(user);
+    serverUser = NULL;
+    
     return 0;
 }
 

@@ -41,10 +41,8 @@ else()
 link_libraries(pthread)
 endif()
 
-#set(DIR_SRCS main.c)
-#add_executable(${APP_NAME} main.c)
-#target_link_libraries(${APP_NAME} ${LIBMRSOCKET})
-
+add_executable(${APP_NAME} main.c)
+target_link_libraries(${APP_NAME} ${LIBMRSOCKET})
 
 #examples
 #tcp===========================
@@ -64,10 +62,10 @@ add_executable(udp_server examples/udp/udp_server.c)
 target_link_libraries(udp_server ${LIBMRSOCKET})
 
 #kcp===========================
-#add_executable(kcp_client examples/kcp/kcp_client.c)
-#target_link_libraries(kcp_client ${LIBMRSOCKET})
-#add_executable(kcp_server examples/kcp/kcp_server.c)
-#target_link_libraries(kcp_server ${LIBMRSOCKET})
+add_executable(kcp_client examples/kcp/kcp_client.c)
+target_link_libraries(kcp_client ${LIBMRSOCKET})
+add_executable(kcp_server examples/kcp/kcp_server.c)
+target_link_libraries(kcp_server ${LIBMRSOCKET})
 
 
 

@@ -1,14 +1,4 @@
 
-// #ifdef __STDC__
-// #undef __STDC__
-// #endif
-// #define __STDC__ 1
-// #define __STDC_VERSION__ 199409L
-// #define __STDC_VERSION__ 199901L
-
-
-
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -26,8 +16,6 @@ struct User{
     struct mr_buffer* buffer;
     int bind_fd;
 };
-
-
 
 static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int accept_fd){
     struct User* user = (struct User*)uid;
@@ -66,35 +54,40 @@ static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int accept_fd)
     }
 }
 
-static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int accept_fd){
+static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int apt_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == 0){
         printf("[main]server handle_kcp_accept data=%s \n", data);
+        struct User* suser = (struct User*)malloc(sizeof(struct User));
+        suser->type = 0;
+        suser->buffer = mr_buffer_create(4);
+        mr_socket_kcp_start((uintptr_t)suser, apt_fd);
+
     }else if (user->type == 1){
         printf("[main]client handle_kcp_accept data=%s \n", data);
         assert(0);
-        user->snd_id = 0;
-        user->rcv_id = 0;
+       //  user->snd_id = 0;
+       //  user->rcv_id = 0;
 
-        // char tmp[1024*100] = {0};
-        char tmp[128] = { 0 };
-        // snprintf(tmp, 2048, "send data hello world");
-        memset(tmp, 97, sizeof(tmp)-1);
-        char* ptr = tmp;
-        uint32_t id = 0;
-        ptr = mr_encode32u(ptr, id);
-        uint32_t time = mr_clock();
-        ptr = mr_encode32u(ptr, time);
-        ptr = mr_encode32u(ptr, (uint32_t)user->snd_id);
-        user->snd_id++;
+       //  // char tmp[1024*100] = {0};
+       //  char tmp[128] = { 0 };
+       //  // snprintf(tmp, 2048, "send data hello world");
+       //  memset(tmp, 97, sizeof(tmp)-1);
+       //  char* ptr = tmp;
+       //  uint32_t id = 0;
+       //  ptr = mr_encode32u(ptr, id);
+       //  uint32_t time = mr_clock();
+       //  ptr = mr_encode32u(ptr, time);
+       //  ptr = mr_encode32u(ptr, (uint32_t)user->snd_id);
+       //  user->snd_id++;
 
-       struct mr_buffer* buffer = user->buffer;
-       mr_buffer_write_pack(buffer, tmp, sizeof(tmp));
-       int ret = mr_socket_kcp_send(accept_fd, buffer->write_data, buffer->write_len);
-        if (ret < 0){
-           printf("handle_kcp_caccept mr_socket_kcp_send faild ret = %d\n", ret);
-        }
+       // struct mr_buffer* buffer = user->buffer;
+       // mr_buffer_write_pack(buffer, tmp, sizeof(tmp));
+       // int ret = mr_socket_kcp_send(accept_fd, buffer->write_data, buffer->write_len);
+       //  if (ret < 0){
+       //     printf("handle_kcp_caccept mr_socket_kcp_send faild ret = %d\n", ret);
+       //  }
     }else{
         assert(0);
     }
@@ -148,7 +141,7 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
             user->rcv_id++;
 
             uint32_t cur_time = mr_clock();
-            // printf("[client]fd = %d, id = %d, rcv_id=%d,  costtime = %d \n",fd, id, rcv_id, cur_time-time);
+             printf("[client]fd = %d, id = %d, rcv_id=%d,  costtime = %d \n",fd, id, rcv_id, cur_time-time);
             assert(id%2 == 1);
 
             char* enptr = buffer->read_data;
@@ -170,7 +163,7 @@ static void handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
 
 static void handle_kcp_close(uintptr_t uid, int fd, char* data, int ud){
     struct User* user = (struct User*)uid;
-    printf("[main]server handle_kcp_accept fd=%fd \n", fd);
+    printf("[main]server handle_kcp_accept fd=%d \n", fd);
 }
 
 int main(int argc, char* argv[])
@@ -197,10 +190,10 @@ int main(int argc, char* argv[])
         assert(0);
     }
 	suser->bind_fd = server_fd;
-    mr_socket_kcp_close(server_fd);
+    // mr_socket_kcp_close(server_fd);
 
    int i = 0;
-   for (; i < 1000; ++i){
+   for (; i < 1; ++i){
         struct User* cuser = (struct User*)malloc(sizeof(struct User));
         cuser->id = i;
         cuser->type = 1;

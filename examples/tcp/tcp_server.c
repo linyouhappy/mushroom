@@ -67,10 +67,8 @@ void server_handle_close(uintptr_t uid, int fd, char* data, int size)
 {
     printf("server_handle_close uid=%d\n", (int)uid);
     struct User* user = (struct User*)uid;
-    if (user == serverUser)
-    {
-        destroy_user(user);
-		serverUser = NULL;
+    if (user == serverUser){
+        
     }else{
         int i = 0;
         for (; i < 0xffff; ++i)
@@ -146,6 +144,8 @@ int main(int argc, char* argv[])
             clientUsers[i] = NULL;
         }
     }
+    destroy_user(user);
+    serverUser = NULL;
     mr_socket_free();
     return 0;
 }
