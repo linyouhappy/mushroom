@@ -16,12 +16,30 @@ struct User{
 };
 
 
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 //60 connections
 #define TEST_CLIENT_NUM 60
-//#define TEST_SERVER_IP "127.0.0.1"
-#define TEST_SERVER_IP "192.168.188.224"
+#else
+//1000 connections
+#define TEST_CLIENT_NUM 1000
+//Yes,1000 socket connect sever
+#endif
+#define TEST_SERVER_IP "127.0.0.1"
+// #define TEST_SERVER_IP "192.168.188.224"
 #define TEST_SERVER_PORT 8765
-struct User* users[TEST_CLIENT_NUM] = {0};
+struct User* clientUsers[TEST_CLIENT_NUM] = {0};
+
+
+struct User* create_user(){
+    struct User* user = (struct User*)malloc(sizeof(struct User));
+    user->buffer = mr_buffer_create(4);
+    return user;
+}
+
+void destroy_user(struct User* user){
+    mr_buffer_free(user->buffer);
+    free(user);
+}
 
 
 static void client_handle_data(uintptr_t uid, int fd, char* data, int size)
@@ -117,13 +135,11 @@ int main(int argc, char* argv[])
     mr_set_handle_error(client_handle_error);
     mr_set_handle_warning(client_handle_warning);
 
-
     int clent_count = TEST_CLIENT_NUM;
     int i = 0;
     for (i = 0; i < clent_count; ++i)
     {
-        struct User* user = (struct User*)malloc(sizeof(struct User));
-        user->buffer = mr_buffer_create(4);
+        struct User* user = create_user();
         user->id = i;
         uintptr_t uid = (uintptr_t)user;
         int fd = mr_socket_connect(uid, TEST_SERVER_IP, TEST_SERVER_PORT);
@@ -134,7 +150,7 @@ int main(int argc, char* argv[])
         }
         printf("mr_socket_connect id=%d, uid=%ld, fd =%d \n", user->id, uid, fd);
         user->fd = fd;
-        users[i] = user;
+        clientUsers[i] = user;
     }
     printf("start success\n");
     while(1)
@@ -143,6 +159,13 @@ int main(int argc, char* argv[])
        mr_sleep(1);
     }
 
-
+    i = 0;
+    for (; i < clent_count; ++i){
+        if (clientUsers[i]){
+            destroy_user(clientUsers[i]);
+            clientUsers[i] = NULL;
+        }
+    }
+    mr_socket_free();
     return 0;
 }

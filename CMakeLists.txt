@@ -48,14 +48,37 @@ endif()
 
 #examples
 #tcp===========================
-add_executable(tcp_client examples/tcp/client.c)
+add_executable(tcp_client examples/tcp/tcp_client.c)
 target_link_libraries(tcp_client ${LIBMRSOCKET})
-add_executable(tcp_server examples/tcp/server.c)
+add_executable(tcp_server examples/tcp/tcp_server.c)
 target_link_libraries(tcp_server ${LIBMRSOCKET})
 
 #codebuffer===========================
 add_executable(codebuffer examples/codebuffer.c)
 target_link_libraries(codebuffer ${LIBMRSOCKET})
+
+#udp===========================
+add_executable(udp_client examples/udp/udp_client.c)
+target_link_libraries(udp_client ${LIBMRSOCKET})
+add_executable(udp_server examples/udp/udp_server.c)
+target_link_libraries(udp_server ${LIBMRSOCKET})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

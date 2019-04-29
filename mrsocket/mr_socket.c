@@ -183,7 +183,6 @@ void mr_socket_update(void){
     while(node){
     	msg = (struct mr_message*)node;
     	node = node->next;
-
     	buffer = msg->buffer == NULL?"":msg->buffer;
       	if (msg->type == MR_SOCKET_TYPE_UDP) {
       		MR_SOCKET->udpcb(msg->uid, msg->fd, buffer, msg->size, msg->option);
@@ -222,10 +221,10 @@ static void forward_message(int type, bool padding, struct socket_message * resu
 	}else{
 		msg->buffer = result->data;
 		msg->size = result->ud;
-		msg->ud = 0;
 		if (msg->type == MR_SOCKET_TYPE_UDP) {
 			msg->option = msg->buffer + msg->ud;
 		}
+		msg->ud = 0;
 	}
 
 	spinlock_lock(&MR_SOCKET->list_lock);

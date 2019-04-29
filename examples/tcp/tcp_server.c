@@ -16,6 +16,9 @@ struct User{
     struct mr_buffer* buffer;
 };
 
+#define TEST_SERVER_IP "0.0.0.0"
+#define TEST_SERVER_PORT 8765
+
 struct User* serverUser = NULL;
 struct User* clientUsers[0xffff] = {0};
 
@@ -111,9 +114,6 @@ void server_handle_warning(uintptr_t uid, int fd, char* data, int size)
     printf("server_handle_warning uid = %d, fd = %d, data = %s, size=%d \n", (int)uid, fd, data, size);
 }
 
-#define TEST_SERVER_IP "0.0.0.0"
-#define TEST_SERVER_PORT 8765
-
 int main(int argc, char* argv[])
 {
     mr_socket_init();
@@ -144,6 +144,7 @@ int main(int argc, char* argv[])
     for (; i < 0xffff; ++i){
         if (clientUsers[i]){
             destroy_user(clientUsers[i]);
+            clientUsers[i] = NULL;
         }
     }
     mr_socket_free();
