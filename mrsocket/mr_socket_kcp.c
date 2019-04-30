@@ -823,6 +823,9 @@ static int handle_bind_write(struct mr_kcp_socket* bind_skt, struct mr_message* 
 	        return -1;
 	    }
 	    ikcp_update(accept_skt->kcp, cur_time);
+	   	uint32_t next_time = ikcp_check(accept_skt->kcp, cur_time);
+		assert(next_time >= cur_time);
+		kcp_socket_addtimer(MR_KCP_SERVER->timer, accept_skt, next_time);
 	    return 0;
 	}else{
 		fprintf(stderr, "[WARN]handle_bind_write Unknown:%d\n", msg->type);
@@ -870,7 +873,7 @@ static inline void kcp_socket_addtimer(struct mr_timer* timer, struct mr_kcp_soc
 }
 
 static void timer_callback(struct mr_timer* timer, void* args) {
-	 uint32_t cur_time = timer->time;
+	uint32_t cur_time = timer->time;
 	struct mr_kcp_socket* skt = (struct mr_kcp_socket*)args;
 	if(skt->type == SOCKET_TYPE_CONNECT || skt->type == SOCKET_TYPE_ACCEPT){
 		ikcp_update(skt->kcp, cur_time);
@@ -880,7 +883,7 @@ static void timer_callback(struct mr_timer* timer, void* args) {
 	    if (skt->kcp->state != 0){
 	    	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 			msg->kcp_fd = skt->kcp_fd;
-			msg->uid = MR_KCP_CMD_CLOSE;
+			msg->type = MR_KCP_CMD_CLOSE;
 			msg->ud = 0;
 			msg->buffer = NULL;
 			send_write_message(msg);

@@ -67,7 +67,11 @@ target_link_libraries(kcp_client ${LIBMRSOCKET})
 add_executable(kcp_server examples/kcp/kcp_server.c)
 target_link_libraries(kcp_server ${LIBMRSOCKET})
 
-
+#p2p===========================
+#add_executable(p2p_client examples/p2p/p2p_client.c)
+#target_link_libraries(p2p_client ${LIBMRSOCKET})
+#add_executable(p2p_server examples/p2p/p2p_server.c)
+#target_link_libraries(p2p_server ${LIBMRSOCKET})
 
 
 

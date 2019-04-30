@@ -18,10 +18,10 @@ struct User{
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 //60 connections
-#define TEST_CLIENT_NUM 60
+#define TEST_CLIENT_NUM 2
 #else
 //1000 connections
-#define TEST_CLIENT_NUM 1000
+#define TEST_CLIENT_NUM 2
 //Yes,1000 socket connect sever
 #endif
 #define TEST_SERVER_IP "127.0.0.1"
@@ -125,15 +125,13 @@ static void client_handle_kcp_close(uintptr_t uid, int fd, char* data, int ud){
 int main(int argc, char* argv[])
 {
     // mr_mem_detect(0xFFFF);
-
-    //kcp params
     mr_socket_kcp_init(0x11223344);
     mr_sokekt_kcp_wndsize(128, 128);
     mr_sokekt_kcp_nodelay(1, 10, 10, 1);
     mr_socket_kcp_run();
 
     mr_kcp_set_handle_connect(client_handle_kcp_connect);
-    // mr_kcp_set_handle_accept(handle_kcp_accept);
+    mr_kcp_set_handle_accept(handle_kcp_accept);
     mr_kcp_set_handle_data(client_handle_kcp_data);
     mr_kcp_set_handle_close(client_handle_kcp_close);
 
@@ -141,7 +139,9 @@ int main(int argc, char* argv[])
    for (; i < TEST_CLIENT_NUM; ++i){
         struct User* user = create_user();
         user->id = i;
-        int bind_fd = mr_socket_kcp((uintptr_t)user, NULL, 0);
+
+        int port = TEST_SERVER_PORT+i+1
+        int bind_fd = mr_socket_kcp((uintptr_t)user, "0.0.0.0", port);
         if (bind_fd < 0){
             printf("mr_socket_kcp faild bind_fd = %d\n", bind_fd);
         }
@@ -149,13 +149,12 @@ int main(int argc, char* argv[])
         user->bind_fd = bind_fd;
         user->fd = 0;
         clientUsers[i] = user;
-		// break;
+		break;
     }
 
     while(1){
         mr_socket_kcp_update();
         mr_sleep(1);
-        // mr_mem_info();
     }
 
     i = 0;

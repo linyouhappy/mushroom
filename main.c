@@ -17,7 +17,7 @@ struct User{
     int bind_fd;
 };
 
-#define kMUserNum 2
+#define kMUserNum 60
 struct User* client_users[kMUserNum] = {0};
 struct User* server_users[kMUserNum*2] = {0};
 struct User* bind_user = NULL;

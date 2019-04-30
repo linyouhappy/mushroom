@@ -135,9 +135,8 @@ int main(int argc, char* argv[])
     mr_set_handle_error(client_handle_error);
     mr_set_handle_warning(client_handle_warning);
 
-    int clent_count = TEST_CLIENT_NUM;
     int i = 0;
-    for (i = 0; i < clent_count; ++i)
+    for (i = 0; i < TEST_CLIENT_NUM; ++i)
     {
         struct User* user = create_user();
         user->id = i;
@@ -160,7 +159,7 @@ int main(int argc, char* argv[])
     }
 
     i = 0;
-    for (; i < clent_count; ++i){
+    for (; i < TEST_CLIENT_NUM; ++i){
         if (clientUsers[i]){
             destroy_user(clientUsers[i]);
             clientUsers[i] = NULL;
