@@ -6,17 +6,23 @@
 #include <stdlib.h>
 
 struct mr_buffer {
-	size_t size;
-	size_t offset;
-	struct mr_buffer_node *head;
-	struct mr_buffer_node *tail;
-
 	int head_len;
+
 	int pack_len;
+
+	size_t read_size;
+	size_t read_offset;
+	struct mr_buffer_node *read_head;
+	struct mr_buffer_node *read_tail;
 
 	int read_len;
 	int read_cap;
 	char* read_data;
+
+	size_t write_size;
+	// size_t write_offset;
+	struct mr_buffer_node *write_head;
+	struct mr_buffer_node *write_tail;
 
 	int write_len;
 	int write_cap;
@@ -36,7 +42,12 @@ int mr_buffer_read_push(struct mr_buffer* buffer, char* msg, size_t len);
 int mr_buffer_read_header(struct mr_buffer* buffer, size_t len);
 int mr_buffer_read(struct mr_buffer* buffer, char* data, int len);
 int mr_buffer_read_pack(struct mr_buffer* buffer);
-int mr_buffer_write_pack(struct mr_buffer* buffer, char* data, size_t len);
+
+
+int mr_buffer_write_push(struct mr_buffer* buffer, char* msg, size_t len);
+int mr_buffer_write_pack(struct mr_buffer* buffer);
+
+// int mr_buffer_write_pack(struct mr_buffer* buffer, char* data, size_t len);
 
 
 #endif

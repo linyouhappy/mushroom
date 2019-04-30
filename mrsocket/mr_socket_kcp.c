@@ -45,12 +45,12 @@
 #define PROTOCOL_UNKNOWN 255
 
 #define MR_SOCKET_TYPE_DATA 1
-#define MR_SOCKET_TYPE_CLOSE 3
-#define MR_SOCKET_TYPE_CONNECT 4
-#define MR_SOCKET_TYPE_ACCEPT 5
-#define MR_SOCKET_TYPE_ERROR 6
-#define MR_SOCKET_TYPE_WARNING 7
+#define MR_SOCKET_TYPE_CLOSE 2
+#define MR_SOCKET_TYPE_ERROR 3
+#define MR_SOCKET_TYPE_WARNING 4
 #define MR_SOCKET_TYPE_COUNT 8
+#define MR_SOCKET_TYPE_CONNECT 10
+#define MR_SOCKET_TYPE_ACCEPT 11
 
 #define MR_KCP_CMD_CONNECT 1
 #define MR_KCP_CMD_SEND 2
@@ -66,6 +66,7 @@ struct mr_message {
 	int kcp_fd;
 	uintptr_t uid;
 	char* buffer;
+	int size;
 	int ud;
 };
 
@@ -102,7 +103,9 @@ struct mr_kcp_server {
 	struct mr_kcp_socket slot[MAX_SOCKET];
 	int alloc_id;
 
-	mr_kcp_callback cbs[MR_SOCKET_TYPE_COUNT];
+	mr_kcp_callback4 cbs[MR_SOCKET_TYPE_COUNT];
+	mr_kcp_callback5 cnt_cb;
+	mr_kcp_callback5 apt_cb;
 
 	pthread_t thread1;
 	uint8_t thread1_run;
@@ -126,11 +129,11 @@ static void mr_kcp_handle_data(uintptr_t uid, int fd, char* data, int size){
 static void mr_kcp_handle_close(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket_kcp]mr_kcp_handle_close uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
-static void mr_kcp_handle_connect(uintptr_t uid, int fd, char* data, int accept_fd){
-    printf("[mr_socket_kcp]mr_kcp_handle_connect uid=%d fd =%d accept_fd=%d data=%s\n", (int)uid, fd, accept_fd, data);
+static void mr_kcp_handle_connect(uintptr_t uid, int fd, char* data, int size, int cnt_fd){
+    printf("[mr_socket_kcp]mr_kcp_handle_connect uid=%d fd =%d cnt_fd=%d size=%d data=%s\n", (int)uid, fd, cnt_fd, size, data);
 }
-static void mr_kcp_handle_accept(uintptr_t uid, int fd, char* data, int accept_fd){
-    printf("[mr_socket_kcp]mr_kcp_handle_accept uid=%d fd =%d accept_fd=%d data=%s\n", (int)uid, fd, accept_fd, data);
+static void mr_kcp_handle_accept(uintptr_t uid, int fd, char* data, int size, int apt_fd){
+    printf("[mr_socket_kcp]mr_kcp_handle_accept uid=%d fd =%d apt_fd=%d size=%d data=%s\n", (int)uid, fd, apt_fd, size, data);
 }
 static void mr_kcp_handle_error(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket_kcp]mr_kcp_handle_error uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
@@ -139,27 +142,27 @@ static void mr_kcp_handle_warning(uintptr_t uid, int fd, char* data, int size){
     printf("[mr_socket_kcp]mr_kcp_handle_warning uid=%d fd=%d size=%d data=%s \n", (int)uid, fd, size, data);
 }
 
-void mr_kcp_set_handle_data(mr_kcp_callback cb){
+void mr_kcp_set_handle_data(mr_kcp_callback4 cb){
 	assert(MR_KCP_SERVER && cb);
 	MR_KCP_SERVER->cbs[MR_SOCKET_TYPE_DATA] = cb;
 }
-void mr_kcp_set_handle_close(mr_kcp_callback cb){
+void mr_kcp_set_handle_close(mr_kcp_callback4 cb){
 	assert(MR_KCP_SERVER && cb);
 	MR_KCP_SERVER->cbs[MR_SOCKET_TYPE_CLOSE] = cb;
 }
-void mr_kcp_set_handle_connect(mr_kcp_callback cb){
+void mr_kcp_set_handle_connect(mr_kcp_callback5 cb){
 	assert(MR_KCP_SERVER && cb);
-	MR_KCP_SERVER->cbs[MR_SOCKET_TYPE_CONNECT] = cb;
+	MR_KCP_SERVER->cnt_cb = cb;
 }
-void mr_kcp_set_handle_accept(mr_kcp_callback cb){
+void mr_kcp_set_handle_accept(mr_kcp_callback5 cb){
 	assert(MR_KCP_SERVER && cb);
-	MR_KCP_SERVER->cbs[MR_SOCKET_TYPE_ACCEPT] = cb;
+	MR_KCP_SERVER->apt_cb = cb;
 }
-void mr_kcp_set_handle_error(mr_kcp_callback cb){
+void mr_kcp_set_handle_error(mr_kcp_callback4 cb){
 	assert(MR_KCP_SERVER && cb);
 	MR_KCP_SERVER->cbs[MR_SOCKET_TYPE_ERROR] = cb;
 }
-void mr_kcp_set_handle_warning(mr_kcp_callback cb){
+void mr_kcp_set_handle_warning(mr_kcp_callback4 cb){
 	assert(MR_KCP_SERVER && cb);
 	MR_KCP_SERVER->cbs[MR_SOCKET_TYPE_WARNING] = cb;
 }
@@ -263,17 +266,13 @@ void mr_socket_kcp_init(uint32_t conv){
 
 	ikcp_allocator(MALLOC, FREE);
 
-	mr_kcp_callback* cbs = svr->cbs;
+	mr_kcp_callback4* cbs = svr->cbs;
 	cbs[MR_SOCKET_TYPE_DATA] = mr_kcp_handle_data;
 	cbs[MR_SOCKET_TYPE_CLOSE] = mr_kcp_handle_close;
-	cbs[MR_SOCKET_TYPE_CONNECT] = mr_kcp_handle_connect;
-	cbs[MR_SOCKET_TYPE_ACCEPT] = mr_kcp_handle_accept;
 	cbs[MR_SOCKET_TYPE_ERROR] = mr_kcp_handle_error;
 	cbs[MR_SOCKET_TYPE_WARNING] = mr_kcp_handle_warning;
-}
-
-void mr_socket_kcp_exit(void){
-	assert(0);
+	svr->cnt_cb = mr_kcp_handle_connect;
+	svr->apt_cb = mr_kcp_handle_accept;
 }
 
 static int kMSndwnd = 128;
@@ -371,10 +370,38 @@ inline static void send_write_message(struct mr_message* msg){
 void mr_socket_kcp_clear(void) {
 	assert(MR_KCP_SERVER);
 	struct mr_kcp_server* svr = MR_KCP_SERVER;
+
 	list_msg_free(&svr->msg_list, &svr->list_lock);
 	list_msg_free(&svr->rd_list, &svr->rd_lock);
 	list_msg_free(&svr->wt_list, &svr->wt_lock);
 }
+
+// void mr_socket_kcp_exit(void){
+// 	struct mr_kcp_server* svr = MR_KCP_SERVER;
+// 	mr_timer_clear(svr->timer);
+
+// 	int i;
+// 	struct mr_kcp_socket* skt;
+// 	for (i = 0; i<MAX_SOCKET; i++) {
+// 		skt = &svr->slot[i];
+// 		if (skt->type != SOCKET_TYPE_INVALID) {
+// 			if (skt->type == SOCKET_TYPE_BIND) {
+// 				socket_server_close(SOCKET_SERVER, skt->kcp_fd, skt->fd);
+// 			}
+// 			skt->type = SOCKET_TYPE_INVALID;
+// 			skt->kcp_fd = 0;
+// 			skt->fd = 0;
+// 			if (skt->kcp){
+// 				kcp_free(skt);
+// 			}
+// 			if (skt->rbtree){
+// 				mr_rbtree_destroy(skt->rbtree);
+// 				skt->rbtree = NULL;
+// 			}
+// 		}
+// 	}
+// 	mr_socket_kcp_clear();
+// }
 
 void mr_socket_kcp_free(void){
 	assert(MR_KCP_SERVER != NULL);
@@ -401,6 +428,7 @@ void mr_socket_kcp_free(void){
 			}
 			if (skt->rbtree){
 				mr_rbtree_destroy(skt->rbtree);
+				skt->rbtree = NULL;
 			}
 		}
 	}
@@ -469,7 +497,7 @@ int mr_socket_kcp_close(int kcp_fd){
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->kcp_fd = kcp_fd;
 	msg->type = MR_KCP_CMD_CLOSE;
-	msg->ud = 0;
+	msg->size = 0;
 	msg->buffer = NULL;
 	send_write_message(msg);
 	return 0;
@@ -482,7 +510,7 @@ static void rbtree_each_close(struct mr_rbtree_root* root, uintptr_t key, uintpt
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->kcp_fd = accept_skt->kcp_fd;
 	msg->type = MR_KCP_CMD_CLOSE;
-	msg->ud = 0;
+	msg->size = 0;
 	msg->buffer = NULL;
 	send_write_message(msg);
 }
@@ -549,13 +577,11 @@ void socket_kcp_close(struct mr_kcp_socket* skt){
 		msg->kcp_fd = kcp_fd;
 		msg->uid = opaque;
 		msg->buffer = NULL;
-		msg->ud = 0;
+		msg->size = 0;
 		forward_list_message(msg);
 	}
 }
 
-// void mr_socket_kcp_shutdown(int kcp_fd){
-// }
 int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 	struct mr_kcp_socket* skt = &MR_KCP_SERVER->slot[HASH_ID(kcp_fd)];
 	if (skt->kcp_fd != kcp_fd) {
@@ -574,7 +600,7 @@ int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 
 	char* buffer = (char*)MALLOC(UDP_ADDRESS_SIZE);
 	memset(buffer, 0, UDP_ADDRESS_SIZE);
-	msg->ud = convert_udp_address(addr, port, (uint8_t*)buffer);
+	msg->size = convert_udp_address(addr, port, (uint8_t*)buffer);
 	msg->buffer = buffer;
 	send_write_message(msg);
 	// printf("mr_socket_kcp_connect kcp_fd=%d, addr=%s, port=%d, fd=%d\n", kcp_fd, addr, port, skt->fd);
@@ -582,6 +608,9 @@ int mr_socket_kcp_connect(int kcp_fd, const char* addr, int port){
 }
 
 int mr_socket_kcp_send(int kcp_fd, const void* buffer, int sz){
+	if (!buffer || sz == 0){
+		return -1;
+	}
 	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 	msg->kcp_fd = kcp_fd;
 	msg->type = MR_KCP_CMD_SEND;
@@ -589,7 +618,7 @@ int mr_socket_kcp_send(int kcp_fd, const void* buffer, int sz){
 	char* sbuffer = (char*)MALLOC(sz);
 	memcpy(sbuffer, buffer, sz);
 	msg->buffer = sbuffer;
-	msg->ud = sz;
+	msg->size = sz;
 	send_write_message(msg);
 	// printf("mr_socket_kcp_send kcp_fd=%d, sz=%d \n", kcp_fd, sz);
 	return 0;
@@ -613,7 +642,7 @@ int mr_socket_kcp_start(uintptr_t uid, int kcp_fd){
 	msg->type = MR_KCP_CMD_START;
 	msg->uid = uid;
 	msg->buffer = NULL;
-	msg->ud = 0;
+	msg->size = 0;
 	send_write_message(msg);
 	return 0;
 }
@@ -666,22 +695,6 @@ static struct mr_kcp_socket* create_accept_socket(struct mr_kcp_socket* bind_skt
 	memcpy(accept_skt->udp_address, udp_address, UDP_ADDRESS_SIZE);
 	mr_rbtree_insert(bind_skt->rbtree, (uintptr_t)accept_skt->udp_address, (uintptr_t)accept_skt);
 
-	// char udp_addr[128] = {0};
-	// mr_socket_kcp_udp_address((const char*)accept_skt->udp_address, udp_addr, (int)sizeof(udp_addr));
-	// printf("create_accept_socket accept_skt udp_addr =%s \n", udp_addr);
-	// printf("create_accept_socket bind_skt->kcp_fd=%d, accept_skt->kcp_fd=%d, accept_skt->type=%d \n", bind_skt->kcp_fd, accept_skt->kcp_fd, accept_skt->type);
-
-	// struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
-	// msg->type = accept_skt->type;
-	// msg->kcp_fd = bind_skt->kcp_fd;
-	// msg->uid = accept_skt->opaque;
-	// int len = strlen(udp_addr)+1;
-	// char* buffer = (char*)MALLOC(len);
-	// memset(buffer, 0, len);
-	// memcpy(buffer, udp_addr, len);
-	// msg->buffer = buffer;
-	// msg->ud = kcp_fd;
-	// forward_list_message(msg);
 	return accept_skt;
 }
 
@@ -705,7 +718,7 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
 		accept_skt->kcp->state = 0;
 	}
 	// printf("kcp_handle_read accept_skt->kcp_fd=%d,accept_skt->type=%d, uid=%lld, ud=%d \n", accept_skt->kcp_fd, accept_skt->type, msg->uid, msg->ud);
-    int len = ikcp_input(accept_skt->kcp, msg->buffer, msg->ud);
+    int len = ikcp_input(accept_skt->kcp, msg->buffer, msg->size);
     if (len < 0){
         switch(len){
             case -1:
@@ -786,6 +799,7 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
 					memset(buffer, 0, len);
 					memcpy(buffer, udp_addr, len);
 					msg->buffer = buffer;
+					msg->size = len;
 					msg->ud = accept_skt->kcp_fd;
 					forward_list_message(msg);
 		    	}else{
@@ -794,12 +808,20 @@ static void kcp_handle_read(struct mr_kcp_socket* accept_skt, struct mr_message*
 					msg->kcp_fd = accept_skt->kcp_fd;
 					msg->uid = accept_skt->opaque;
 					msg->buffer = rd_data;
-					msg->ud = len;
+					msg->size = len;
 					forward_list_message(msg);
 		    	}
 		    }
         }
     }
+}
+
+static inline void kcp_socket_addtimer(struct mr_timer* timer, struct mr_kcp_socket* skt, uint32_t timer_time){
+	if (skt->timer_time > 0 && skt->timer_time <= timer_time){
+		return;
+	}
+	skt->timer_time = timer_time;
+	mr_timer_add(timer, (struct mr_slist_node*)skt, timer_time);
 }
 
 static int handle_bind_write(struct mr_kcp_socket* bind_skt, struct mr_message* msg, uint32_t cur_time){
@@ -836,7 +858,7 @@ static int handle_bind_write(struct mr_kcp_socket* bind_skt, struct mr_message* 
 
 static int handle_accept_write(struct mr_kcp_socket* accept_skt, struct mr_message* msg){
 	if (msg->type == MR_KCP_CMD_SEND){
-		int ret = ikcp_send(accept_skt->kcp, msg->buffer, msg->ud);
+		int ret = ikcp_send(accept_skt->kcp, msg->buffer, msg->size);
 	    if (ret < 0){
 	        fprintf(stderr, "handle_accept_write fail! code:%d \n",ret);
 	        KCPASSERT(0);
@@ -859,17 +881,8 @@ static int handle_accept_write(struct mr_kcp_socket* accept_skt, struct mr_messa
 		socket_kcp_close(accept_skt);
 		return -1;
 	}else{
-
 	}
 	return 0;
-}
-
-static inline void kcp_socket_addtimer(struct mr_timer* timer, struct mr_kcp_socket* skt, uint32_t timer_time){
-	if (skt->timer_time > 0 && skt->timer_time <= timer_time){
-		return;
-	}
-	skt->timer_time = timer_time;
-	mr_timer_add(timer, (struct mr_slist_node*)skt, timer_time);
 }
 
 static void timer_callback(struct mr_timer* timer, void* args) {
@@ -884,8 +897,8 @@ static void timer_callback(struct mr_timer* timer, void* args) {
 	    	struct mr_message* msg = (struct mr_message*)MALLOC(sizeof(struct mr_message));
 			msg->kcp_fd = skt->kcp_fd;
 			msg->type = MR_KCP_CMD_CLOSE;
-			msg->ud = 0;
 			msg->buffer = NULL;
+			msg->size = 0;
 			send_write_message(msg);
 	    	return;
 	    }
@@ -927,7 +940,7 @@ static void *thread_kcp_socket_handle(void* p) {
     			if(bind_skt->fd == msg->fd){
     				if (msg->type == SOCKET_UDP){
     					if (bind_skt->type == SOCKET_TYPE_BIND){
-    						accept_skt = get_accept_socket(bind_skt, (const char*)(msg->buffer + msg->ud), SOCKET_TYPE_ACCEPT);
+    						accept_skt = get_accept_socket(bind_skt, (const char*)(msg->buffer + msg->size), SOCKET_TYPE_ACCEPT);
 							kcp_handle_read(accept_skt, msg);
 							if (accept_skt->isopen){
 								ikcp_update(accept_skt->kcp, cur_time);
@@ -937,19 +950,19 @@ static void *thread_kcp_socket_handle(void* p) {
 							}
     					}else{
     						fprintf(stderr, "[WARN]bind socket is closed. kcp_fd = %d, fd= %d \n", msg->kcp_fd, msg->fd);
-    						KCPASSERT(0);
+    						// KCPASSERT(0);
     					}
     				}else if (msg->type == SOCKET_CLOSE){
     					if (bind_skt->type == SOCKET_TYPE_BCLOSE){
     						socket_kcp_close(bind_skt);
     					}else{
     						fprintf(stderr, "[WARN]bind socket is closed. kcp_fd = %d, fd= %d \n", msg->kcp_fd, msg->fd);
-    						KCPASSERT(0);
+    						// KCPASSERT(0);
     					}
     				}
     			}else{
     				fprintf(stderr, "[WARN]bind socket is closed. kcp_fd = %d, fd= %d \n", msg->kcp_fd, msg->fd);
-    				KCPASSERT(0);
+    				// KCPASSERT(0);
     			}
 				if(msg->buffer){
 		    		FREE(msg->buffer);
@@ -1003,6 +1016,9 @@ static void *thread_kcp_socket_handle(void* p) {
         if (delta_ts <= 0){
         	mr_sleep(1);
         }else{
+        	if (delta_ts > 20){
+        		delta_ts = 20;
+        	}
         	cur_time += delta_ts;
         }
     }
@@ -1015,9 +1031,9 @@ static void forward_message(int type, struct socket_message * result) {
 	msg->fd = result->id;
 	msg->kcp_fd = result->opaque;
 	// msg->uid = 0;
-	msg->ud = result->ud;
 	msg->buffer = result->data;
-	
+	msg->size = result->ud;
+
 	spinlock_lock(&MR_KCP_SERVER->rd_lock);
 	mr_slist_link(&MR_KCP_SERVER->rd_list, (struct mr_slist_node*)msg);
 	spinlock_unlock(&MR_KCP_SERVER->rd_lock);
@@ -1091,7 +1107,13 @@ void mr_socket_kcp_update(void){
     while(node){
     	msg = (struct mr_message*)node;
     	node = node->next;
-      	MR_KCP_SERVER->cbs[msg->type](msg->uid, msg->kcp_fd, msg->buffer, msg->ud);
+    	if (msg->type == SOCKET_TYPE_CONNECT){
+    		MR_KCP_SERVER->cnt_cb(msg->uid, msg->kcp_fd, msg->buffer, msg->size, msg->ud);
+    	}else if (msg->type == SOCKET_TYPE_ACCEPT){
+    		MR_KCP_SERVER->apt_cb(msg->uid, msg->kcp_fd, msg->buffer, msg->size, msg->ud);
+    	}else{
+      		MR_KCP_SERVER->cbs[msg->type](msg->uid, msg->kcp_fd, msg->buffer, msg->size);
+    	}
       	if (msg->buffer){
       		FREE(msg->buffer);
       	}

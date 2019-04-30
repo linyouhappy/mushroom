@@ -29,6 +29,7 @@ struct mr_timer* mr_timer_create(void);
 void mr_timer_free(struct mr_timer* timer);
 void mr_timer_add(struct mr_timer* timer, struct mr_slist_node* skt, uint32_t time);
 void mr_timer_shift(struct mr_timer* timer);
+void mr_timer_clear();
 void mr_timer_execute(struct mr_timer* timer, void(*func)(struct mr_timer*, void*));
 
 #endif

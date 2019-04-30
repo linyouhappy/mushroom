@@ -39,6 +39,8 @@ struct mr_socket {
 	mr_callback4 cbs[MR_SOCKET_TYPE_COUNT];
 	mr_callback5 apt_bc;
 	mr_udp_callback udpcb;
+	pthread_t thread;
+	uint8_t thread_run;
 };
 
 struct mr_message {
@@ -157,6 +159,10 @@ void mr_socket_clear(void) {
 
 void mr_socket_free(void) {
 	assert(SOCKET_SERVER);
+
+	MR_SOCKET->thread_run = 0;
+	pthread_join(MR_SOCKET->thread, NULL); 
+
 	socket_server_release(SOCKET_SERVER);
 	SOCKET_SERVER = NULL;
 
@@ -276,7 +282,7 @@ int mr_socket_poll(void) {
 
 static void *thread_socket(void* p) {
 	int r;
-	for (;;) {
+	while (MR_SOCKET->thread_run) {
 		r = mr_socket_poll();
 		if (r==0) break;
 	}
@@ -285,8 +291,8 @@ static void *thread_socket(void* p) {
 }
 
 void mr_socket_run(void){
-	pthread_t thread;
-	int ret = pthread_create(&thread, NULL, (void *)&thread_socket, NULL);
+	MR_SOCKET->thread_run = 1;
+	int ret = pthread_create(&MR_SOCKET->thread, NULL, (void *)&thread_socket, NULL);
 	if (ret != 0) {
 		fprintf(stderr, "Create thread failed");
 		exit(1);

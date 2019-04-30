@@ -30,13 +30,14 @@ int main(int argc, char* argv[])
         ptr = mr_encode16u(ptr, txtlen);
         memcpy(ptr, txt, txtlen);
 
-        mr_buffer_write_pack(buffer, tmp, ptr-tmp+txtlen);
+        mr_buffer_write_push(buffer, tmp, ptr-tmp+txtlen);
 
+        mr_buffer_write_pack(buffer);
         char* snddata = buffer->write_data;
-		int sndsize = buffer->write_len;
+        int sndsize = buffer->write_len;
         mr_buffer_read_push(buffer, snddata, sndsize);
     }
-    
+
     int rcv_id = 0;
     while(1){
          int ret = mr_buffer_read_pack(buffer);

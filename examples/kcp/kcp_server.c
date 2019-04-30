@@ -32,7 +32,7 @@ void destroy_user(struct User* user){
     free(user);
 }
 
-static void server_handle_kcp_accept(uintptr_t uid, int fd, char* data, int apt_fd){
+static void server_handle_kcp_accept(uintptr_t uid, int fd, char* data, int size, int apt_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     assert(serverUser == user);
@@ -71,7 +71,8 @@ static void server_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
         char* enptr = buffer->read_data;
         enptr = mr_encode32u(enptr, ++id);
 
-        mr_buffer_write_pack(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_push(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_pack(buffer);
         int ret = mr_socket_kcp_send(fd, buffer->write_data, buffer->write_len);
         if (ret < 0){
             printf("[server]mr_socket_kcp_send faild ret = %d\n", ret);
@@ -79,7 +80,7 @@ static void server_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
     }
 }
 
-static void server_handle_kcp_close(uintptr_t uid, int fd, char* data, int ud)
+static void server_handle_kcp_close(uintptr_t uid, int fd, char* data, int size)
 {
     struct User* user = (struct User*)uid;
     printf("[main]server handle_kcp_accept fd=%d \n", fd);

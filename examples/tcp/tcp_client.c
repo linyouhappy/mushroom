@@ -70,7 +70,8 @@ static void client_handle_data(uintptr_t uid, int fd, char* data, int size)
         enptr = mr_encode32u(enptr, (uint32_t)user->snd_id);
         user->snd_id++;
 
-        mr_buffer_write_pack(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_push(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_pack(buffer);
         int ret = mr_socket_send(fd, buffer->write_data, buffer->write_len);
         if (ret < 0)
         {
@@ -100,8 +101,8 @@ static void client_handle_connect(uintptr_t uid, int fd, char* data, int size)
     user->snd_id++;
 
    struct mr_buffer* buffer = user->buffer;
-   mr_buffer_write_pack(buffer, tmp, sizeof(tmp));
-
+   mr_buffer_write_push(buffer, tmp, sizeof(tmp));
+   mr_buffer_write_pack(buffer);
    int ret = mr_socket_send(fd, buffer->write_data, buffer->write_len);
    if (ret < 0)
    {

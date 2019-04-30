@@ -41,7 +41,7 @@ void destroy_user(struct User* user){
     free(user);
 }
 
-static void client_handle_kcp_connect(uintptr_t uid, int fd, char* data, int cnt_fd)
+static void client_handle_kcp_connect(uintptr_t uid, int fd, char* data, int size, int cnt_fd)
 {
     printf("client_handle_kcp_connect uid=%d, fd=%d, data=%s, cnt_fd=%d \n", (int)uid, fd, data, cnt_fd);
     struct User* user = (struct User*)uid;
@@ -67,7 +67,8 @@ static void client_handle_kcp_connect(uintptr_t uid, int fd, char* data, int cnt
     user->snd_id++;
 
     struct mr_buffer* buffer = user->buffer;
-    mr_buffer_write_pack(buffer, tmp, sizeof(tmp));
+    mr_buffer_write_push(buffer, tmp, sizeof(tmp));
+    mr_buffer_write_pack(buffer);
     int ret = mr_socket_kcp_send(cnt_fd, buffer->write_data, buffer->write_len);
     if (ret < 0){
        printf("client_handle_kcp_connect mr_socket_kcp_send faild ret = %d\n", ret);
@@ -108,7 +109,8 @@ static void client_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
         enptr = mr_encode32u(enptr, (uint32_t)user->snd_id);
         user->snd_id++;
 
-        mr_buffer_write_pack(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_push(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_pack(buffer);
         int ret = mr_socket_kcp_send(fd, buffer->write_data, buffer->write_len);
         if (ret < 0)
         {
@@ -117,7 +119,7 @@ static void client_handle_kcp_data(uintptr_t uid, int fd, char* data, int size)
     }
 }
 
-static void client_handle_kcp_close(uintptr_t uid, int fd, char* data, int ud){
+static void client_handle_kcp_close(uintptr_t uid, int fd, char* data, int size){
     // struct User* user = (struct User*)uid;
     printf("client_handle_kcp_close uid=%d, fd=%d \n", (int)uid, fd);
 }

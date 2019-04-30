@@ -55,7 +55,8 @@ void server_handle_data(uintptr_t uid, int fd, char* data, int size)
         char* enptr = buffer->read_data;
         enptr = mr_encode32u(enptr, ++id);
 
-        mr_buffer_write_pack(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_push(buffer, buffer->read_data, buffer->read_len);
+        mr_buffer_write_pack(buffer);
         int ret = mr_socket_send(fd, buffer->write_data, buffer->write_len);
         if (ret < 0){
             printf("[server]server_handle_data faild ret = %d\n", ret);

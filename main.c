@@ -40,7 +40,7 @@ void destroy_user(struct User* user){
     mr_mem_free(user);
 }
 
-static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int cnt_fd){
+static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int size, int cnt_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == kMSERVER_TYPE){
@@ -76,7 +76,7 @@ static void handle_kcp_connect(uintptr_t uid, int fd, char* data, int cnt_fd){
     }
 }
 
-static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int apt_fd){
+static void handle_kcp_accept(uintptr_t uid, int fd, char* data, int size, int apt_fd){
     struct User* user = (struct User*)uid;
     assert(user->bind_fd == fd);
     if (user->type == kMSERVER_TYPE){
@@ -247,6 +247,8 @@ int main(int argc, char* argv[])
         mr_sleep(1);
     }
 
+    //mr_socket_kcp_exit();
+
 	{
 		int i = 0;
 		for (; i < kMUserNum; ++i) {
@@ -257,7 +259,7 @@ int main(int argc, char* argv[])
 	}
 
 	{
-		int n = 1000;
+		int n = 500;
 		while (n-- > 0) {
 			mr_socket_kcp_update();
 			mr_sleep(1);

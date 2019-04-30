@@ -25,6 +25,19 @@ void mr_timer_free(struct mr_timer* timer){
     FREE(timer);
 }
 
+void mr_timer_clear(struct mr_timer* timer){
+    memset(timer, 0, sizeof(struct mr_timer));
+    int i, j;
+    for (i=0;i<TIME_NEAR;i++) {
+        mr_slist_clear(&timer->near[i].queue);
+    }
+    for (i=0;i<4;i++) {
+        for (j=0;j<TIME_LEVEL;j++) {
+            mr_slist_clear(&timer->t[i][j].queue);
+        }
+    }
+}
+
 static inline void mr_timer_link(struct mr_timer_node* node, struct mr_slist_node* skt, uint32_t time){
     mr_slist_link(&node->queue, skt);
     node->time = time;
