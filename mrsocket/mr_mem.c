@@ -12,7 +12,7 @@
 #include "atomic.h"
 #endif
 
-#define MEMORY_ALLOCTAG 0x20140605
+#define MEMORY_ALLOCTAG 0x20190429
 #define MEMORY_FREETAG 0x0badf00d
 
 // #define MEMORY_CHECK

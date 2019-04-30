@@ -103,6 +103,11 @@ struct mr_kcp_server {
 	int alloc_id;
 
 	mr_kcp_callback cbs[MR_SOCKET_TYPE_COUNT];
+
+	pthread_t thread1;
+	uint8_t thread1_run;
+	pthread_t thread2;
+	uint8_t thread2_run;
 };
 
 union sockaddr_all {
@@ -231,34 +236,34 @@ int mr_socket_kcp_udp_address(const char* address, char* udp_addr, int len){
 
 void mr_socket_kcp_init(uint32_t conv){
 	assert(MR_KCP_SERVER == NULL);
-	struct mr_kcp_server* kcp_svr = (struct mr_kcp_server*)MALLOC(sizeof(struct mr_kcp_server));
-	memset(kcp_svr, 0, sizeof(struct mr_kcp_server));
-	MR_KCP_SERVER = kcp_svr;
-	kcp_svr->conv = conv;
+	struct mr_kcp_server* svr = (struct mr_kcp_server*)MALLOC(sizeof(struct mr_kcp_server));
+	memset(svr, 0, sizeof(struct mr_kcp_server));
+	MR_KCP_SERVER = svr;
+	svr->conv = conv;
 
-	mr_slist_clear(&kcp_svr->rd_list);
-	spinlock_init(&kcp_svr->rd_lock);
-	mr_slist_clear(&kcp_svr->wt_list);
-	spinlock_init(&kcp_svr->wt_lock);
+	mr_slist_clear(&svr->rd_list);
+	spinlock_init(&svr->rd_lock);
+	mr_slist_clear(&svr->wt_list);
+	spinlock_init(&svr->wt_lock);
 
-	mr_slist_clear(&kcp_svr->msg_list);
-	spinlock_init(&kcp_svr->list_lock);
+	mr_slist_clear(&svr->msg_list);
+	spinlock_init(&svr->list_lock);
 
 	int i;
 	struct mr_kcp_socket* skt;
 	for (i = 0; i<MAX_SOCKET; i++) {
-		skt = &kcp_svr->slot[i];
+		skt = &svr->slot[i];
 		skt->type = SOCKET_TYPE_INVALID;
 	}
-	kcp_svr->alloc_id = 0;
+	svr->alloc_id = 0;
 
 	assert(SOCKET_SERVER == NULL);
 	SOCKET_SERVER = socket_server_create(0);
-	kcp_svr->timer = mr_timer_create();
+	svr->timer = mr_timer_create();
 
 	ikcp_allocator(MALLOC, FREE);
 
-	mr_kcp_callback* cbs = kcp_svr->cbs;
+	mr_kcp_callback* cbs = svr->cbs;
 	cbs[MR_SOCKET_TYPE_DATA] = mr_kcp_handle_data;
 	cbs[MR_SOCKET_TYPE_CLOSE] = mr_kcp_handle_close;
 	cbs[MR_SOCKET_TYPE_CONNECT] = mr_kcp_handle_connect;
@@ -365,48 +370,57 @@ inline static void send_write_message(struct mr_message* msg){
 
 void mr_socket_kcp_clear(void) {
 	assert(MR_KCP_SERVER);
-	struct mr_kcp_server* kcp_svr = MR_KCP_SERVER;
-	list_msg_free(&kcp_svr->msg_list, &kcp_svr->list_lock);
-	list_msg_free(&kcp_svr->rd_list, &kcp_svr->rd_lock);
-	list_msg_free(&kcp_svr->wt_list, &kcp_svr->wt_lock);
+	struct mr_kcp_server* svr = MR_KCP_SERVER;
+	list_msg_free(&svr->msg_list, &svr->list_lock);
+	list_msg_free(&svr->rd_list, &svr->rd_lock);
+	list_msg_free(&svr->wt_list, &svr->wt_lock);
 }
 
 void mr_socket_kcp_free(void){
-	assert(0);
-
 	assert(MR_KCP_SERVER != NULL);
-
-	struct mr_kcp_server* kcp_svr = MR_KCP_SERVER;
-	int i;
-	struct mr_kcp_socket* skt;
-	for (i=0; i<MAX_SOCKET; i++) {
-		skt = &kcp_svr->slot[i];
-		if (skt->type != SOCKET_TYPE_INVALID) {
-			skt->type = SOCKET_TYPE_INVALID;
-			kcp_free(skt);
-		}
-	}
-	mr_socket_kcp_clear();
-	spinlock_destroy(&kcp_svr->list_lock);
-	spinlock_destroy(&kcp_svr->rd_lock);
-	spinlock_destroy(&kcp_svr->wt_lock);
-
-	FREE(MR_KCP_SERVER);
-	MR_KCP_SERVER = NULL;
+	struct mr_kcp_server* svr = MR_KCP_SERVER;
+	svr->thread1_run = 0;
+	pthread_join(svr->thread1, NULL); 
+	svr->thread2_run = 0;
+	pthread_join(svr->thread2, NULL); 
 
 	assert(SOCKET_SERVER);
 	socket_server_release(SOCKET_SERVER);
 	SOCKET_SERVER = NULL;
+
+	mr_timer_free(svr->timer);
+
+	int i;
+	struct mr_kcp_socket* skt;
+	for (i = 0; i<MAX_SOCKET; i++) {
+		skt = &svr->slot[i];
+		if (skt->type != SOCKET_TYPE_INVALID) {
+			skt->type = SOCKET_TYPE_INVALID;
+			if (skt->kcp){
+				kcp_free(skt);
+			}
+			if (skt->rbtree){
+				mr_rbtree_destroy(skt->rbtree);
+			}
+		}
+	}
+	mr_socket_kcp_clear();
+	spinlock_destroy(&svr->list_lock);
+	spinlock_destroy(&svr->rd_lock);
+	spinlock_destroy(&svr->wt_lock);
+
+	FREE(MR_KCP_SERVER);
+	MR_KCP_SERVER = NULL;
 }
 
-static int reserve_id(struct mr_kcp_server* kcp_svr) {
+static int reserve_id(struct mr_kcp_server* svr) {
 	int i;
 	for (i=0;i<MAX_SOCKET;i++) {
-		int id = ATOM_INC(&(kcp_svr->alloc_id));
+		int id = ATOM_INC(&(svr->alloc_id));
 		if (id < 0) {
-			id = ATOM_AND(&(kcp_svr->alloc_id), 0x7fffffff);
+			id = ATOM_AND(&(svr->alloc_id), 0x7fffffff);
 		}
-		struct mr_kcp_socket* skt = &kcp_svr->slot[HASH_ID(id)];
+		struct mr_kcp_socket* skt = &svr->slot[HASH_ID(id)];
 		if (skt->type == SOCKET_TYPE_INVALID) {
 			if (ATOM_CAS(&skt->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				assert(skt->kcp == NULL);
@@ -893,7 +907,7 @@ static void *thread_kcp_socket_handle(void* p) {
     struct mr_kcp_socket* bind_skt;
     struct mr_kcp_socket* accept_skt;
     struct mr_kcp_socket* skt;
-    while(1){
+    while(svr->thread2_run){
     	start_ts = mr_clock();
 
     	cur_time++;
@@ -1035,8 +1049,9 @@ static int mr_socket_kcp_poll(void) {
 }
 
 static void *thread_kcp_socket_poll(void* p) {
+	struct mr_kcp_server* svr = MR_KCP_SERVER;
 	int r;
-	for (;;) {
+	while (svr->thread1_run) {
 		r = mr_socket_kcp_poll();
 		if (r==0) break;
 	}
@@ -1044,14 +1059,15 @@ static void *thread_kcp_socket_poll(void* p) {
 }
 
 void mr_socket_kcp_run(void){
-	pthread_t thread1;
-	int ret = pthread_create(&thread1, NULL, (void *)&thread_kcp_socket_poll, NULL);
+	struct mr_kcp_server* svr = MR_KCP_SERVER;
+	svr->thread1_run = 1;
+	svr->thread2_run = 1;
+	int ret = pthread_create(&svr->thread1, NULL, (void *)&thread_kcp_socket_poll, NULL);
 	if (ret < 0) {
 		fprintf(stderr, "mr_socket_kcp_run create poll thread failed");
 		exit(1);
 	}
-	pthread_t thread2;
-	ret = pthread_create(&thread2, NULL, (void *)&thread_kcp_socket_handle, NULL);
+	ret = pthread_create(&svr->thread2, NULL, (void *)&thread_kcp_socket_handle, NULL);
 	if (ret < 0) {
 		fprintf(stderr, "mr_socket_kcp_run create handle thread failed");
 		exit(1);
